@@ -240,14 +240,20 @@ parser_state = {
     'references': [],
 }
 
+childs_cnt = len(article)
+childs_processed = 0
 for child in article:
+    print('Processed %d/%d top level elements' % (childs_processed, \
+        childs_cnt), file=sys.stderr)
     if child.tag == 'a':
         process_toplevel_a(child, parser_state)
     elif child.tag == 'p':
         process_toplevel_p(child, parser_state)
     elif child.tag == 'img':
         process_toplevel_img(child, parser_state)
+    childs_processed += 1
 
+print('Postprocessing references...', file=sys.stderr)
 postprocess_references(parser_state)
 
 with open(parser_state['slug'] + '.html', 'w', encoding='utf-8') as f:

@@ -108,6 +108,7 @@ def process_span(span, s):
     s['footnotes'].append(footnote)
     s['fn_counter'] += 1
 
+
 def process_strong(strong, deep_level, s):
     s['res'] += '**' if (deep_level % 2 == 0) else '__'
     s['res'] += strong.text or ''
@@ -192,8 +193,8 @@ def process_toplevel_p(p, s):
 def process_toplevel_img(img, s):
     url = full_url(img.get('src'), context_url=s['base_url']),
     s['res'] += '![](TODO "%s")' % img.get('title') + s['line_break']
-    s['res'] += '[labels]'  + s['line_break']
-    s['res'] += 'TODO'      + s['line_break']
+    s['res'] += '[labels]' + s['line_break']
+    s['res'] += 'TODO' + s['line_break']
     s['res'] += '[/labels]' + s['line_break']
     s['res'] += 'render: ![](%s)' % url + s['par_sep']
 
@@ -202,7 +203,8 @@ def postprocess_references(s):
     for ref in s['references']:
         # TODO: check for spaces and so on
         title = get_title(ref['url'])
-        s['res'] += '[%s]: %s "%s"' % (ref['num'], ref['url'], title) + s['par_sep']
+        s['res'] += '[%s]: %s "%s"' % (ref['num'], ref['url'], title) + \
+            s['par_sep']
 
 
 url = 'http://what-if.xkcd.com'

@@ -201,8 +201,12 @@ def process_toplevel_p(p, s):
 
 
 def process_toplevel_img(img, s):
-    url = full_url(img.get('src'), context_url=s['base_url']),
-    s['res'] += '![](TODO "%s")' % img.get('title') + s['line_break']
+    url = full_url(img.get('src'), context_url=s['base_url'])
+    img_file = url.rstrip('/').rsplit('/', 1)[1]
+    img_name, img_ext = img_file.rsplit('.')
+    img_file_ru = img_name + '_ru.' + img_ext
+    s['res'] += '![](/uploads/%s/%s "%s")' % (s['slug'], img_file_ru, \
+        img.get('title')) + s['line_break']
     s['res'] += '[labels]' + s['line_break']
     s['res'] += 'TODO' + s['line_break']
     s['res'] += '[/labels]' + s['line_break']

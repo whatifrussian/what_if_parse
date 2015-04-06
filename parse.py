@@ -1,9 +1,13 @@
 #!/usr/bin/python3
 
 
+import sys
 import requests
 from requests.exceptions import RequestException, BaseHTTPError
 import lxml.html
+
+
+EXIT_WRONG_ARGS = 1
 
 
 def get_page(url, utf8=False):
@@ -69,7 +73,7 @@ def process_toplevel_a(a, s):
     url = full_url(a.get('href'), context_url=s['base_url'])
     num = int(url.rstrip('/').rsplit('/', 1)[1])
 
-    s['slug'] = str(num) + '-' + title.lower().replace(' ', '-')
+    s['slug'] = str(num).rjust(3, '0') + '-' + title.lower().replace(' ', '-')
     s['res'] += title + s['line_break']
     s['res'] += url + s['par_sep']
 
@@ -212,7 +216,13 @@ def postprocess_references(s):
         s['res'] += '[%s]: %s "%s"' % (ref['num'], ref['url'], title) + \
             s['par_sep']
 
-url = 'http://what-if.xkcd.com'
+if len(sys.argv) == 1:
+    url = 'http://what-if.xkcd.com'
+elif len(sys.argv) == 2 and sys.argv[1].isdigit():
+    url = 'http://what-if.xkcd.com/' + sys.argv[1].lstrip('0')
+else:
+    print('Usage: %s [num]' % sys.argv[0], file=sys.stderr)
+    exit(EXIT_WRONG_ARGS)
 html = get_page(url, utf8=True)
 doc = lxml.html.document_fromstring(html)
 article = doc.xpath('//body//article')[0]

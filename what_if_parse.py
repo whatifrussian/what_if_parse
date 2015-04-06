@@ -1,5 +1,10 @@
 #!/usr/bin/python3
 
+# TODO's residence:
+# * deduplicate code
+# * cross OS packaging
+# * pylint
+# * documenting (README, docstring)
 
 import sys
 import requests

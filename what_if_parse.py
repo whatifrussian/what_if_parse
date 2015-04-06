@@ -26,7 +26,9 @@ def get_page(url, utf8=False):
 
 # TODO: check content-type
 def get_title(url):
+    print('[get_title] Download page from %s' % url, file=sys.stderr)
     html = get_page(url)
+    print('[get_title] Extract title from the page', file=sys.stderr)
     doc = lxml.html.document_fromstring(html)
     ts = doc.xpath('//title')
     return ts[0].text.strip() if len(ts) >= 1 else 'TODO'
@@ -227,6 +229,8 @@ elif len(sys.argv) == 2 and sys.argv[1].isdigit():
 else:
     print('Usage: %s [num]' % sys.argv[0], file=sys.stderr)
     exit(EXIT_WRONG_ARGS)
+
+print('Download article from %s' % url, file=sys.stderr)
 html = get_page(url, utf8=True)
 doc = lxml.html.document_fromstring(html)
 article = doc.xpath('//body//article')[0]
@@ -260,7 +264,12 @@ for child in article:
 print('Postprocessing references...', file=sys.stderr)
 postprocess_references(parser_state)
 
-with open(parser_state['slug'] + '.html', 'w', encoding='utf-8') as f:
+html_file = parser_state['slug'] + '.html'
+md_file = parser_state['slug'] + '.md'
+
+with open(html_file, 'w', encoding='utf-8') as f:
+    print('Write article in html to file %s' % html_file, file=sys.stderr)
     print(article_html, file=f)
-with open(parser_state['slug'] + '.md', 'w', encoding='utf-8') as f:
+with open(md_file, 'w', encoding='utf-8') as f:
+    print('Write article in markdown to file %s' % md_file, file=sys.stderr)
     print(parser_state['res'].rstrip(), file=f)

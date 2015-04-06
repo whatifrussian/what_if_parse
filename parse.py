@@ -5,7 +5,7 @@ from requests.exceptions import RequestException, BaseHTTPError
 import lxml.html
 
 
-def get_page(url, utf8 = False):
+def get_page(url, utf8=False):
     try:
         r = requests.get(url)
     except (RequestException, BaseHTTPError) as e:
@@ -47,10 +47,10 @@ def full_url(url, context_url):
 
 
 # http://stackoverflow.com/a/24151860/1598057
-def innerHTML(node, strip = True):
+def innerHTML(node, strip=True):
     res = node.text or ''
     for child in node:
-        res += lxml.html.tostring(child, encoding = 'unicode')
+        res += lxml.html.tostring(child, encoding='unicode')
     if strip:
         res = res.strip()
     return res
@@ -64,7 +64,7 @@ def process_footnotes(s):
 
 def process_toplevel_a(a, s):
     s['res'] += a.xpath('./h1')[0].text.strip() + s['line_break']
-    s['res'] += full_url(a.get('href'), context_url = s['base_url'])
+    s['res'] += full_url(a.get('href'), context_url=s['base_url'])
     s['res'] += s['par_sep']
 
 
@@ -72,7 +72,7 @@ def process_a(a, s):
     s['res'] += '[%s][%d]' % (innerHTML(a), s['ref_counter'])
     ref = {
         'num': s['ref_counter'],
-        'url': full_url(a.get('href'), context_url = s['base_url']),
+        'url': full_url(a.get('href'), context_url=s['base_url']),
     }
     s['references'].append(ref)
     s['ref_counter'] += 1
@@ -97,7 +97,7 @@ def ret_span(span, orig_s):
 def process_span(span, s):
     # TODO: extract number, don't reenum via 'fn_counver'
     if span.get('class') != 'ref':
-        s['res'] += lxml.html.tostring(span, encoding = 'unicode')
+        s['res'] += lxml.html.tostring(span, encoding='unicode')
         return
 
     s['res'] += '[^%s]' % s['fn_counter']
@@ -122,7 +122,7 @@ def process_strong(strong, deep_level, s):
         elif child.tag == 'span':
             process_span(child, s)
         else:
-            s['res'] += lxml.html.tostring(child, encoding = 'unicode')
+            s['res'] += lxml.html.tostring(child, encoding='unicode')
             tail_added = True
         if not tail_added:
             s['res'] += child.tail or ''
@@ -144,7 +144,7 @@ def process_em(em, deep_level, s):
         elif child.tag == 'span':
             process_span(child, s)
         else:
-            s['res'] += lxml.html.tostring(child, encoding = 'unicode')
+            s['res'] += lxml.html.tostring(child, encoding='unicode')
             tail_added = True
         if not tail_added:
             s['res'] += child.tail or ''
@@ -178,7 +178,7 @@ def process_toplevel_p(p, s):
         elif child.tag == 'sup':
             s['res'] += '<sup>' + ret_span(child, s) + '</sup>'
         else:
-            s['res'] += lxml.html.tostring(child, encoding = 'unicode')
+            s['res'] += lxml.html.tostring(child, encoding='unicode')
             tail_added = True
         if not tail_added:
             s['res'] += child.tail or ''
@@ -190,7 +190,7 @@ def process_toplevel_p(p, s):
 
 
 def process_toplevel_img(img, s):
-    url = full_url(img.get('src'), context_url = s['base_url']),
+    url = full_url(img.get('src'), context_url=s['base_url']),
     s['res'] += '![](TODO "%s")' % img.get('title') + s['line_break']
     s['res'] += '[labels]'  + s['line_break']
     s['res'] += 'TODO'      + s['line_break']
@@ -206,11 +206,11 @@ def postprocess_references(s):
 
 
 url = 'http://what-if.xkcd.com'
-html = get_page(url, utf8 = True)
+html = get_page(url, utf8=True)
 doc = lxml.html.document_fromstring(html)
 article = doc.xpath('//body//article')[0]
-with open('a.html', 'w', encoding = 'utf-8') as f:
-    print(innerHTML(article), file = f)
+with open('a.html', 'w', encoding='utf-8') as f:
+    print(innerHTML(article), file=f)
 
 parser_state = {
     'base_url': url,
@@ -233,5 +233,5 @@ for child in article:
 
 postprocess_references(parser_state)
 
-with open('a.md', 'w', encoding = 'utf-8') as f:
-    print(parser_state['res'].rstrip(), file = f)
+with open('a.md', 'w', encoding='utf-8') as f:
+    print(parser_state['res'].rstrip(), file=f)

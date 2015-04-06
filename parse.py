@@ -20,6 +20,7 @@ def get_page(url, utf8=False):
     return r.text
 
 
+# TODO: check content-type
 def get_title(url):
     html = get_page(url)
     doc = lxml.html.document_fromstring(html)
@@ -64,9 +65,13 @@ def process_footnotes(s):
 
 
 def process_toplevel_a(a, s):
-    s['res'] += a.xpath('./h1')[0].text.strip() + s['line_break']
-    s['res'] += full_url(a.get('href'), context_url=s['base_url'])
-    s['res'] += s['par_sep']
+    title = a.xpath('./h1')[0].text.strip()
+    url = full_url(a.get('href'), context_url=s['base_url'])
+    num = int(url.rstrip('/').rsplit('/', 1)[1])
+
+    s['slug'] = str(num) + '-' + title.lower().replace(' ', '-')
+    s['res'] += title + s['line_break']
+    s['res'] += url + s['par_sep']
 
 
 def process_a(a, s):
@@ -207,15 +212,14 @@ def postprocess_references(s):
         s['res'] += '[%s]: %s "%s"' % (ref['num'], ref['url'], title) + \
             s['par_sep']
 
-
 url = 'http://what-if.xkcd.com'
 html = get_page(url, utf8=True)
 doc = lxml.html.document_fromstring(html)
 article = doc.xpath('//body//article')[0]
-with open('a.html', 'w', encoding='utf-8') as f:
-    print(innerHTML(article), file=f)
+article_html = innerHTML(article)
 
 parser_state = {
+    'slug': None,
     'base_url': url,
     'ref_counter': 1,
     'fn_counter': 1,
@@ -236,5 +240,7 @@ for child in article:
 
 postprocess_references(parser_state)
 
-with open('a.md', 'w', encoding='utf-8') as f:
+with open(parser_state['slug'] + '.html', 'w', encoding='utf-8') as f:
+    print(article_html, file=f)
+with open(parser_state['slug'] + '.md', 'w', encoding='utf-8') as f:
     print(parser_state['res'].rstrip(), file=f)

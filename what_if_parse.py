@@ -8,7 +8,6 @@
 #
 # Issues:
 # * references in footnotes
-# * PDFs and getting title freeze
 # * don't switch italic/bold mark when its isn't beside
 
 import sys
@@ -18,30 +17,47 @@ import lxml.html
 
 
 EXIT_WRONG_ARGS = 1
+EXIT_GET_PAGE_ERROR = 2
+
+
+class GetPageError(Exception):
+    pass
 
 
 def get_page(url, utf8=False):
     try:
-        r = requests.get(url)
+        r = requests.get(url, headers={'Accept': 'text/html'})
     except (RequestException, BaseHTTPError) as e:
-        print('Exception occured at http request performing: ' + url)
-        exit(1)
+        print('[get_page] Exception occured at http request performing: ' \
+            + url, file=sys.stderr)
+        raise GetPageError()
     if r.status_code != requests.codes.ok:
-        print('HTTP status code: ' + str(r.status_code) + '; url: ' + url)
-        exit(2)
+        print('[get_page] HTTP status code: %d; url: %s' % \
+            (r.status_code, url), file=sys.stderr)
+        raise GetPageError()
     if utf8:
         r.encoding = 'utf-8'
-    return r.text
+    content_type = r.headers['content-type']
+    if content_type.startswith('text/html'):
+        return r.text
+    else:
+        print('[get_page] Content type "%s" != "text/html": ; url: %s' % \
+            (content_type, url), file=sys.stderr)
+        raise GetPageError()
 
 
-# TODO: check content-type
-def get_title(url):
+def get_title(url, default_res='TODO'):
     print('[get_title] Download page from %s' % url, file=sys.stderr)
-    html = get_page(url)
+    try:
+        html = get_page(url)
+    except GetPageError as e:
+        print('[get_title] Skip title extracting: get page error or wrong html page', \
+            file=sys.stderr)
+        return default_res
     print('[get_title] Extract title from the page', file=sys.stderr)
     doc = lxml.html.document_fromstring(html)
     ts = doc.xpath('//title')
-    return ts[0].text.strip() if len(ts) >= 1 else 'TODO'
+    return ts[0].text.strip() if len(ts) >= 1 else default_res
 
 
 # assume 'context_url' are full url
@@ -242,7 +258,11 @@ else:
     exit(EXIT_WRONG_ARGS)
 
 print('Download article from %s' % url, file=sys.stderr)
-html = get_page(url, utf8=True)
+try:
+    html = get_page(url, utf8=True)
+except GetPageError as e:
+    print('Error when getting page, exitting...', file=sys.stderr)
+    exit(EXIT_GET_PAGE_ERROR)
 doc = lxml.html.document_fromstring(html)
 article = doc.xpath('//body//article')[0]
 article_html = innerHTML(article)

@@ -5,6 +5,11 @@
 # * cross OS packaging
 # * pylint
 # * documenting (README, docstring)
+#
+# Issues:
+# * references in footnotes
+# * PDFs and getting title freeze
+# * don't switch italic/bold mark when its isn't beside
 
 import sys
 import requests

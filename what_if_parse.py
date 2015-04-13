@@ -57,7 +57,14 @@ def get_title(url, default_res='TODO'):
     print('[get_title] Extract title from the page', file=sys.stderr)
     doc = lxml.html.document_fromstring(html)
     ts = doc.xpath('//title')
-    return ts[0].text.strip() if len(ts) >= 1 else default_res
+    if len(ts) == 0:
+        return default_res
+    res = ''
+    for line in ts[0].text.split('\n'):
+        line = line.strip()
+        if len(line) > 0:
+            res += line + ' '
+    return res.rstrip()
 
 
 # assume 'context_url' are full url
@@ -244,7 +251,6 @@ def process_toplevel_img(img, s):
 
 def postprocess_references(s):
     for ref in s['references']:
-        # TODO: check for spaces and so on
         title = get_title(ref['url'])
         s['res'] += '[%s]: %s "%s"' % (ref['num'], ref['url'], title) + \
             s['par_sep']

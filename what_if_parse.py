@@ -80,7 +80,8 @@ def process_toplevel_a(a, s):
     url = full_url(a.get('href'), context_url=s['base_url'])
     num = int(url.rstrip('/').rsplit('/', 1)[1])
 
-    s['slug'] = str(num).rjust(3, '0') + '-' + title.lower().replace(' ', '-')
+    s['slug'] = str(num).rjust(3, '0') + '-' + title.lower() \
+        .replace(' ', '-').replace('.', '')
     s['res'] += title + s['line_break']
     s['res'] += url + s['par_sep']
 

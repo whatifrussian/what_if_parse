@@ -1,14 +1,14 @@
 #!/usr/bin/python3
 
 # TODO's residence:
-# * deduplicate code
 # * cross OS packaging
 # * pylint
 # * documenting (README, docstring)
 #
 # Issues:
+# * return result from 'process_*' function, not add to 'res' in it
 # * references in footnotes
-# * don't switch italic/bold mark when its isn't beside
+# * don't switch italic/bold mark when its isn't beside (remove deep_level)
 
 import sys
 import requests
@@ -41,7 +41,7 @@ def get_page(url, utf8=False):
     if content_type.startswith('text/html'):
         return r.text
     else:
-        print('[get_page] Content type "%s" != "text/html": ; url: %s' % \
+        print('[get_page] Content type "%s" != "text/html"; url: %s' % \
             (content_type, url), file=sys.stderr)
         raise GetPageError()
 
@@ -124,85 +124,66 @@ def process_a(a, s):
     s['ref_counter'] += 1
 
 
-# TODO: make it in some other way
-def ret_span(span, orig_s):
-    s = {
-        'base_url': orig_s['base_url'],
-        'ref_counter': 1,
-        'fn_counter': 1,
-        'par_sep': '\n\n',
-        'line_break': '\n',
-        'res': '',
-        'footnotes': [],
-        'references': [],
-    }
-    process_toplevel_p(span, s)
-    return s['res'].strip()
+def process_childs(elem, deep_level, s):
+    s['res'] += elem.text or ''
+    for child in elem:
+        tail_added = False
+        if child.tag == 'em':
+            process_em(child, deep_level, s)
+        elif child.tag == 'strong':
+            process_strong(child, deep_level, s)
+        elif child.tag == 'a':
+            process_a(child, s)
+        elif child.tag == 'span':
+            process_span(child, s)
+        elif child.tag == 'sup':
+            child_parser = new_parser()
+            process_toplevel_p(child, child_parser)
+            # TODO: references
+            s['res'] += '<sup>%s</sup>' % child_parser['res'].strip()
+        else:
+            s['res'] += lxml.html.tostring(child, encoding='unicode')
+            tail_added = True
+        if not tail_added:
+            s['res'] += child.tail or ''
 
 
 def process_span(span, s):
-    # TODO: extract number, don't reenum via 'fn_counver'
     if span.get('class') != 'ref':
         s['res'] += lxml.html.tostring(span, encoding='unicode')
         return
 
     s['res'] += '[^%s]' % s['fn_counter']
+    refbody = span.xpath('./span[@class="refbody"]')[0]
+    child_parser = new_parser()
+    process_toplevel_p(refbody, child_parser)
     footnote = {
         'num': s['fn_counter'],
-        'body': ret_span(span.xpath('./span[@class="refbody"]')[0], s),
+        'body': child_parser['res'].strip(),
     }
     s['footnotes'].append(footnote)
     s['fn_counter'] += 1
 
 
 def process_strong(strong, deep_level, s):
-    s['res'] += '**' if (deep_level % 2 == 0) else '__'
-    s['res'] += strong.text or ''
-    for child in strong:
-        tail_added = False
-        if child.tag == 'em':
-            process_em(child, deep_level + 1, s)
-        elif child.tag == 'strong':
-            process_strong(child, deep_level + 1, s)
-        elif child.tag == 'a':
-            process_a(child, s)
-        elif child.tag == 'span':
-            process_span(child, s)
-        else:
-            s['res'] += lxml.html.tostring(child, encoding='unicode')
-            tail_added = True
-        if not tail_added:
-            s['res'] += child.tail or ''
-    s['res'] += '**' if (deep_level % 2 == 0) else '__'
+    mark = '**' if (deep_level % 2 == 0) else '__'
+    s['res'] += mark
+    process_childs(strong, deep_level + 1, s)
+    s['res'] += mark
 
 
-# TODO: deduplicate code
 def process_em(em, deep_level, s):
-    s['res'] += '*' if (deep_level % 2 == 0) else '_'
-    s['res'] += em.text or ''
-    for child in em:
-        tail_added = False
-        if child.tag == 'em':
-            process_em(child, deep_level + 1, s)
-        elif child.tag == 'strong':
-            process_strong(child, deep_level + 1, s)
-        elif child.tag == 'a':
-            process_a(child, s)
-        elif child.tag == 'span':
-            process_span(child, s)
-        else:
-            s['res'] += lxml.html.tostring(child, encoding='unicode')
-            tail_added = True
-        if not tail_added:
-            s['res'] += child.tail or ''
-    s['res'] += '*' if (deep_level % 2 == 0) else '_'
+    mark = '*' if (deep_level % 2 == 0) else '_'
+    s['res'] += mark
+    process_childs(em, deep_level + 1, s)
+    s['res'] += mark
 
 
 def maybe_formula(par):
     if par.lstrip().startswith(r'\[') and par.rstrip().endswith(r'\]'):
         return '$$ ' + par.strip()[2:-2].strip() + ' $$'
     else:
-        return par
+        return ''
 
 
 def process_toplevel_p(p, s):
@@ -212,23 +193,7 @@ def process_toplevel_p(p, s):
         s['res'] += '> '
     # TODO: check for formula only for entire fragment
     s['res'] += maybe_formula(p.text or '')
-    for child in p:
-        tail_added = False
-        if child.tag == 'em':
-            process_em(child, 0, s)
-        elif child.tag == 'strong':
-            process_strong(child, 0, s)
-        elif child.tag == 'a':
-            process_a(child, s)
-        elif child.tag == 'span':
-            process_span(child, s)
-        elif child.tag == 'sup':
-            s['res'] += '<sup>' + ret_span(child, s) + '</sup>'
-        else:
-            s['res'] += lxml.html.tostring(child, encoding='unicode')
-            tail_added = True
-        if not tail_added:
-            s['res'] += child.tail or ''
+    process_childs(p, 0, s)
     if is_question:
         s['res'] += s['line_break'] + '>' + s['line_break']
     else:
@@ -255,6 +220,21 @@ def postprocess_references(s):
         s['res'] += '[%s]: %s "%s"' % (ref['num'], ref['url'], title) + \
             s['par_sep']
 
+
+def new_parser():
+    return {
+        'slug': None,
+        'base_url': url,
+        'ref_counter': 1,
+        'fn_counter': 1,
+        'par_sep': '\n\n',
+        'line_break': '\n',
+        'res': '',
+        'footnotes': [],
+        'references': [],
+    }
+
+
 if len(sys.argv) == 1:
     url = 'http://what-if.xkcd.com'
 elif len(sys.argv) == 2 and sys.argv[1].isdigit():
@@ -273,17 +253,7 @@ doc = lxml.html.document_fromstring(html)
 article = doc.xpath('//body//article')[0]
 article_html = innerHTML(article)
 
-parser_state = {
-    'slug': None,
-    'base_url': url,
-    'ref_counter': 1,
-    'fn_counter': 1,
-    'par_sep': '\n\n',
-    'line_break': '\n',
-    'res': '',
-    'footnotes': [],
-    'references': [],
-}
+parser_state = new_parser()
 
 childs_cnt = len(article)
 childs_processed = 0

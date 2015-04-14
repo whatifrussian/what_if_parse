@@ -6,7 +6,6 @@
 # * documenting (README, docstring)
 #
 # Issues:
-# * return result from 'process_*' function, not add to 'res' in it
 # * don't switch italic/bold mark when its isn't beside (remove deep_level)
 
 import sys
@@ -96,10 +95,12 @@ def innerHTML(node, strip=True):
     return res
 
 
-def process_footnotes(s):
+def pop_footnotes(s):
+    res = ''
     for fn in s['footnotes']:
-        s['res'] += '[^%s]: %s' % (fn['num'], fn['body']) + s['par_sep']
+        res += '[^%s]: %s' % (fn['num'], fn['body']) + s['par_sep']
     s['footnotes'] = []
+    return res
 
 
 def process_toplevel_a(a, s):
@@ -109,76 +110,76 @@ def process_toplevel_a(a, s):
 
     s['slug'] = str(num).rjust(3, '0') + '-' + title.lower() \
         .replace(' ', '-').replace('.', '')
-    s['res'] += title + s['line_break']
-    s['res'] += url + s['par_sep']
+
+    res = title + s['line_break']
+    res += url + s['par_sep']
+    return res
 
 
 def process_a(a, s):
-    s['res'] += '[%s][%d]' % (innerHTML(a), s['ref_counter'])
+    res = '[%s][%d]' % (innerHTML(a), s['ref_counter'])
     ref = {
         'num': s['ref_counter'],
         'url': full_url(a.get('href'), context_url=s['base_url']),
     }
     s['references'].append(ref)
     s['ref_counter'] += 1
+    return res
 
 
 def process_childs(elem, deep_level, s):
-    s['res'] += elem.text or ''
+    res = elem.text or ''
     for child in elem:
         tail_added = False
         if child.tag == 'em':
-            process_em(child, deep_level, s)
+            res += process_em(child, deep_level, s)
         elif child.tag == 'strong':
-            process_strong(child, deep_level, s)
+            res += process_strong(child, deep_level, s)
         elif child.tag == 'a':
-            process_a(child, s)
+            res += process_a(child, s)
         elif child.tag == 'span':
-            process_span(child, s)
+            res += process_span(child, s)
         elif child.tag == 'sup':
-            s['res'] += '<sup>'
-            process_childs(child, 0, s)
-            s['res'] += '</sup>'
+            res += '<sup>%s</sup>' % process_childs(child, 0, s)
         else:
-            s['res'] += lxml.html.tostring(child, encoding='unicode')
+            res += lxml.html.tostring(child, encoding='unicode')
             tail_added = True
         if not tail_added:
-            s['res'] += child.tail or ''
+            res += child.tail or ''
+    return res
 
 
 def process_span(span, s):
     if span.get('class') != 'ref':
-        s['res'] += lxml.html.tostring(span, encoding='unicode')
-        return
+        return lxml.html.tostring(span, encoding='unicode')
 
-    s['res'] += '[^%s]' % s['fn_counter']
+    res = '[^%s]' % s['fn_counter']
     refbody = span.xpath('./span[@class="refbody"]')[0]
-    s_res = s['res']
-    s['res'] = ''
     # TODO: formulas in footnotes?
-    process_childs(refbody, 0, s)
-    refbody_parsed = s['res'].strip()
-    s['res'] = s_res
+    refbody_parsed = process_childs(refbody, 0, s).strip()
     footnote = {
         'num': s['fn_counter'],
         'body': refbody_parsed,
     }
     s['footnotes'].append(footnote)
     s['fn_counter'] += 1
+    return res
 
 
 def process_strong(strong, deep_level, s):
     mark = '**' if (deep_level % 2 == 0) else '__'
-    s['res'] += mark
-    process_childs(strong, deep_level + 1, s)
-    s['res'] += mark
+    res = mark
+    res += process_childs(strong, deep_level + 1, s)
+    res += mark
+    return res
 
 
 def process_em(em, deep_level, s):
     mark = '*' if (deep_level % 2 == 0) else '_'
-    s['res'] += mark
-    process_childs(em, deep_level + 1, s)
-    s['res'] += mark
+    res = mark
+    res += process_childs(em, deep_level + 1, s)
+    res += mark
+    return res
 
 
 def maybe_formula(par):
@@ -191,16 +192,18 @@ def maybe_formula(par):
 def process_toplevel_p(p, s):
     is_question = 'id' in p.attrib and p.attrib['id'] == 'question'
     is_attribute = 'id' in p.attrib and p.attrib['id'] == 'attribute'
+    res = ''
     if is_question or is_attribute:
-        s['res'] += '> '
+        res += '> '
     # TODO: check for formula only for entire fragment
-    s['res'] += maybe_formula(p.text or '')
-    process_childs(p, 0, s)
+    res += maybe_formula(p.text or '')
+    res += process_childs(p, 0, s)
     if is_question:
-        s['res'] += s['line_break'] + '>' + s['line_break']
+        res += s['line_break'] + '>' + s['line_break']
     else:
-        s['res'] += s['par_sep']
-    process_footnotes(s)
+        res += s['par_sep']
+    res += pop_footnotes(s)
+    return res
 
 
 def process_toplevel_img(img, s):
@@ -208,19 +211,23 @@ def process_toplevel_img(img, s):
     img_file = url.rstrip('/').rsplit('/', 1)[1]
     img_name, img_ext = img_file.rsplit('.')
     img_file_ru = img_name + '_ru.' + img_ext
-    s['res'] += '![](/uploads/%s/%s "%s")' % (s['slug'], img_file_ru, \
+
+    res = '![](/uploads/%s/%s "%s")' % (s['slug'], img_file_ru, \
         img.get('title')) + s['line_break']
-    s['res'] += '[labels]' + s['line_break']
-    s['res'] += 'TODO' + s['line_break']
-    s['res'] += '[/labels]' + s['line_break']
-    s['res'] += 'render: ![](%s)' % url + s['par_sep']
+    res += '[labels]' + s['line_break']
+    res += 'TODO' + s['line_break']
+    res += '[/labels]' + s['line_break']
+    res += 'render: ![](%s)' % url + s['par_sep']
+    return res
 
 
 def postprocess_references(s):
+    res = ''
     for ref in s['references']:
         title = get_title(ref['url'])
-        s['res'] += '[%s]: %s "%s"' % (ref['num'], ref['url'], title) + \
+        res += '[%s]: %s "%s"' % (ref['num'], ref['url'], title) + \
             s['par_sep']
+    return res
 
 
 def new_parser():
@@ -231,7 +238,6 @@ def new_parser():
         'fn_counter': 1,
         'par_sep': '\n\n',
         'line_break': '\n',
-        'res': '',
         'footnotes': [],
         'references': [],
     }
@@ -257,21 +263,25 @@ article_html = innerHTML(article)
 
 parser_state = new_parser()
 
+res = ''
 childs_cnt = len(article)
 childs_processed = 0
 for child in article:
+    func_dict = {
+        'a': process_toplevel_a,
+        'p': process_toplevel_p,
+        'img': process_toplevel_img,
+    }
     print('Processed %d/%d top level elements' % (childs_processed, \
         childs_cnt), file=sys.stderr)
-    if child.tag == 'a':
-        process_toplevel_a(child, parser_state)
-    elif child.tag == 'p':
-        process_toplevel_p(child, parser_state)
-    elif child.tag == 'img':
-        process_toplevel_img(child, parser_state)
+    if child.tag in func_dict.keys():
+        res += func_dict[child.tag](child, parser_state)
+    else:
+        print('Unexpected toplevel element: ' + child.tag, file=sys.stderr)
     childs_processed += 1
 
 print('Postprocessing references...', file=sys.stderr)
-postprocess_references(parser_state)
+res += postprocess_references(parser_state)
 
 html_file = parser_state['slug'] + '.html'
 md_file = parser_state['slug'] + '.md'
@@ -281,4 +291,4 @@ with open(html_file, 'w', encoding='utf-8') as f:
     print(article_html, file=f)
 with open(md_file, 'w', encoding='utf-8') as f:
     print('Write article in markdown to file %s' % md_file, file=sys.stderr)
-    print(parser_state['res'].rstrip(), file=f)
+    print(res.rstrip(), file=f)

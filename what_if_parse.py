@@ -7,7 +7,6 @@
 #
 # Issues:
 # * return result from 'process_*' function, not add to 'res' in it
-# * references in footnotes
 # * don't switch italic/bold mark when its isn't beside (remove deep_level)
 
 import sys
@@ -137,10 +136,9 @@ def process_childs(elem, deep_level, s):
         elif child.tag == 'span':
             process_span(child, s)
         elif child.tag == 'sup':
-            child_parser = new_parser()
-            process_toplevel_p(child, child_parser)
-            # TODO: references
-            s['res'] += '<sup>%s</sup>' % child_parser['res'].strip()
+            s['res'] += '<sup>'
+            process_childs(child, 0, s)
+            s['res'] += '</sup>'
         else:
             s['res'] += lxml.html.tostring(child, encoding='unicode')
             tail_added = True
@@ -155,11 +153,15 @@ def process_span(span, s):
 
     s['res'] += '[^%s]' % s['fn_counter']
     refbody = span.xpath('./span[@class="refbody"]')[0]
-    child_parser = new_parser()
-    process_toplevel_p(refbody, child_parser)
+    s_res = s['res']
+    s['res'] = ''
+    # TODO: formulas in footnotes?
+    process_childs(refbody, 0, s)
+    refbody_parsed = s['res'].strip()
+    s['res'] = s_res
     footnote = {
         'num': s['fn_counter'],
-        'body': child_parser['res'].strip(),
+        'body': refbody_parsed,
     }
     s['footnotes'].append(footnote)
     s['fn_counter'] += 1

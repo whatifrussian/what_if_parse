@@ -44,15 +44,16 @@ def get_page(url, utf8=False):
         raise GetPageError()
 
 
-def get_title(url, default_res='TODO'):
-    print('[get_title] Download page from %s' % url, file=sys.stderr)
+def get_title(ref, refs_cnt, default_res='TODO'):
+    header = '[get_title %d/%d] ' % (ref['num'], refs_cnt)
+    print(header + 'Download page from %s' % ref['url'], file=sys.stderr)
     try:
-        html = get_page(url)
+        html = get_page(ref['url'])
     except GetPageError as e:
-        print('[get_title] Skip title extracting: get page error or wrong html page', \
+        print(header + 'Skip title extracting: get page error or wrong html page', \
             file=sys.stderr)
         return default_res
-    print('[get_title] Extract title from the page', file=sys.stderr)
+    print(header + 'Extract title from the page', file=sys.stderr)
     doc = lxml.html.document_fromstring(html)
     ts = doc.xpath('//title')
     if len(ts) == 0:
@@ -223,8 +224,9 @@ def process_toplevel_img(img, s):
 
 def postprocess_references(s):
     res = ''
+    refs_cnt = len(s['references'])
     for ref in s['references']:
-        title = get_title(ref['url'])
+        title = get_title(ref, refs_cnt)
         res += '[%s]: %s "%s"' % (ref['num'], ref['url'], title) + \
             s['par_sep']
     return res

@@ -4,6 +4,7 @@
 # * cross OS packaging
 # * pylint
 # * documenting (README, docstring)
+# * --quiet|-q option for disabling progress reports
 #
 # Issues:
 # * don't switch italic/bold mark when its isn't beside (remove deep_level)

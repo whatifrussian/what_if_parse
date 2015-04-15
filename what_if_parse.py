@@ -5,9 +5,6 @@
 # * pylint
 # * documenting (README, docstring)
 # * --quiet|-q option for disabling progress reports
-#
-# Issues:
-# * don't switch italic/bold mark when its isn't beside (remove deep_level)
 
 import sys
 import requests
@@ -129,20 +126,28 @@ def process_a(a, s):
     return res
 
 
-def process_childs(elem, deep_level, s):
+def process_childs(elem, s, em_mark='*', strong_mark='**'):
     res = elem.text or ''
     for child in elem:
         tail_added = False
         if child.tag == 'em':
-            res += process_em(child, deep_level, s)
+            child_mark = '_' if em_mark == '*' else '*'
+            res += em_mark
+            res += process_childs(child, s, em_mark=child_mark)
+            res += em_mark
         elif child.tag == 'strong':
-            res += process_strong(child, deep_level, s)
+            child_mark = '__' if strong_mark == '**' else '**'
+            res += strong_mark
+            res += process_childs(child, s, strong_mark=child_mark)
+            res += strong_mark
         elif child.tag == 'a':
             res += process_a(child, s)
         elif child.tag == 'span':
             res += process_span(child, s)
         elif child.tag == 'sup':
-            res += '<sup>%s</sup>' % process_childs(child, 0, s)
+            res += '<sup>'
+            res += process_childs(child, s)
+            res += '</sup>'
         else:
             res += lxml.html.tostring(child, encoding='unicode')
             tail_added = True
@@ -158,29 +163,13 @@ def process_span(span, s):
     res = '[^%s]' % s['fn_counter']
     refbody = span.xpath('./span[@class="refbody"]')[0]
     # TODO: formulas in footnotes?
-    refbody_parsed = process_childs(refbody, 0, s).strip()
+    refbody_parsed = process_childs(refbody, s).strip()
     footnote = {
         'num': s['fn_counter'],
         'body': refbody_parsed,
     }
     s['footnotes'].append(footnote)
     s['fn_counter'] += 1
-    return res
-
-
-def process_strong(strong, deep_level, s):
-    mark = '**' if (deep_level % 2 == 0) else '__'
-    res = mark
-    res += process_childs(strong, deep_level + 1, s)
-    res += mark
-    return res
-
-
-def process_em(em, deep_level, s):
-    mark = '*' if (deep_level % 2 == 0) else '_'
-    res = mark
-    res += process_childs(em, deep_level + 1, s)
-    res += mark
     return res
 
 
@@ -199,7 +188,7 @@ def process_toplevel_p(p, s):
         res += '> '
     # TODO: check for formula only for entire fragment
     res += maybe_formula(p.text or '')
-    res += process_childs(p, 0, s)
+    res += process_childs(p, s)
     if is_question:
         res += s['line_break'] + '>' + s['line_break']
     else:
@@ -233,7 +222,7 @@ def postprocess_references(s):
     return res
 
 
-def new_parser():
+def new_parser(url):
     return {
         'slug': None,
         'base_url': url,
@@ -246,52 +235,62 @@ def new_parser():
     }
 
 
-if len(sys.argv) == 1:
-    url = 'http://what-if.xkcd.com'
-elif len(sys.argv) == 2 and sys.argv[1].isdigit():
-    url = 'http://what-if.xkcd.com/' + sys.argv[1].lstrip('0')
-else:
-    print('Usage: %s [num]' % sys.argv[0], file=sys.stderr)
-    exit(EXIT_WRONG_ARGS)
+def process_article(url, html):
+    doc = lxml.html.document_fromstring(html)
+    article = doc.xpath('//body//article')[0]
+    article_html = innerHTML(article)
 
-print('Download article from %s' % url, file=sys.stderr)
-try:
-    html = get_page(url, utf8=True)
-except GetPageError as e:
-    print('Error when getting page, exitting...', file=sys.stderr)
-    exit(EXIT_GET_PAGE_ERROR)
-doc = lxml.html.document_fromstring(html)
-article = doc.xpath('//body//article')[0]
-article_html = innerHTML(article)
+    parser_state = new_parser(url)
 
-parser_state = new_parser()
-
-res = ''
-childs_cnt = len(article)
-childs_processed = 0
-for child in article:
+    res = ''
+    childs_cnt = len(article)
+    childs_processed = 0
     func_dict = {
         'a': process_toplevel_a,
         'p': process_toplevel_p,
         'img': process_toplevel_img,
     }
-    print('Processed %d/%d top level elements' % (childs_processed, \
-        childs_cnt), file=sys.stderr)
-    if child.tag in func_dict.keys():
-        res += func_dict[child.tag](child, parser_state)
+    for child in article:
+        print('Processed %d/%d top level elements' % (childs_processed, \
+            childs_cnt), file=sys.stderr)
+        if child.tag in func_dict.keys():
+            res += func_dict[child.tag](child, parser_state)
+        else:
+            print('Unexpected toplevel element: ' + child.tag, file=sys.stderr)
+        childs_processed += 1
+
+    print('Postprocessing references...', file=sys.stderr)
+    res += postprocess_references(parser_state)
+
+    return article_html, res.strip(), parser_state['slug']
+
+
+if __name__ == '__main__':
+    if len(sys.argv) == 1:
+        url = 'http://what-if.xkcd.com'
+    elif len(sys.argv) == 2 and sys.argv[1].isdigit():
+        url = 'http://what-if.xkcd.com/' + sys.argv[1].lstrip('0')
     else:
-        print('Unexpected toplevel element: ' + child.tag, file=sys.stderr)
-    childs_processed += 1
+        print('Usage: %s [num]' % sys.argv[0], file=sys.stderr)
+        exit(EXIT_WRONG_ARGS)
 
-print('Postprocessing references...', file=sys.stderr)
-res += postprocess_references(parser_state)
+    print('Download article from %s' % url, file=sys.stderr)
+    try:
+        html = get_page(url, utf8=True)
+    except GetPageError as e:
+        print('Error when getting page, exitting...', file=sys.stderr)
+        exit(EXIT_GET_PAGE_ERROR)
 
-html_file = parser_state['slug'] + '.html'
-md_file = parser_state['slug'] + '.md'
+    article_html, article_md, slug = process_article(url, html)
 
-with open(html_file, 'w', encoding='utf-8') as f:
-    print('Write article in html to file %s' % html_file, file=sys.stderr)
-    print(article_html, file=f)
-with open(md_file, 'w', encoding='utf-8') as f:
-    print('Write article in markdown to file %s' % md_file, file=sys.stderr)
-    print(res.rstrip(), file=f)
+    html_file = slug + '.html'
+    md_file = slug + '.md'
+
+    with open(html_file, 'w', encoding='utf-8') as f:
+        print('Write article in html to file %s' % html_file, \
+            file=sys.stderr)
+        print(article_html, file=f)
+    with open(md_file, 'w', encoding='utf-8') as f:
+        print('Write article in markdown to file %s' % md_file, \
+            file=sys.stderr)
+        print(article_md, file=f)

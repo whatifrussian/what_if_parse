@@ -8,8 +8,7 @@ The module defines set of functions for downloading and parsing articles from
 """
 
 # TODO's residence:
-# * cross OS packaging
-# * documenting (README)
+# * OS packaging (document installation and usage)
 # * --quiet|-q option for disabling progress reports
 
 import sys

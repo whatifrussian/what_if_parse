@@ -1,3 +1,4 @@
 *.html
 *.md
 .*.sw[a-z]
+__pycache__

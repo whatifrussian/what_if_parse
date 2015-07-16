@@ -18,4 +18,4 @@ Resulting HTML and Markdown will saved into files like `001-relativistic-basebal
 
 ## License
 
-The code, documentation and other repository content is in public domain.
+The code, documentation and other repository content are in public domain.

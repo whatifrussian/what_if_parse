@@ -251,7 +251,7 @@ def process_toplevel_img(img, state):
     img_name, img_ext = img_file.rsplit('.')
     img_file_ru = img_name + '_ru.' + img_ext
 
-    title_text = img.get('title')
+    title_text = img.get('title').replace('"', '\\"')
     if len(title_text) == 0:
         res = '![](/uploads/%s/%s)' % (state['slug'], img_file_ru) + \
             state['line_break']
@@ -270,9 +270,9 @@ def postprocess_references(state):
     res = ''
     refs_cnt = len(state['references'])
     for reference in state['references']:
-        title = get_title(reference, refs_cnt)
+        title_text = get_title(reference, refs_cnt).replace('"', '\\"')
         res += '[%s]: %s "%s"' % (reference['num'], reference['url'], \
-            title) + state['par_sep']
+            title_text) + state['par_sep']
     return res
 
 

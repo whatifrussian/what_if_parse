@@ -251,8 +251,13 @@ def process_toplevel_img(img, state):
     img_name, img_ext = img_file.rsplit('.')
     img_file_ru = img_name + '_ru.' + img_ext
 
-    res = '![](/uploads/%s/%s "%s")' % (state['slug'], img_file_ru, \
-        img.get('title')) + state['line_break']
+    title_text = img.get('title')
+    if len(title_text) == 0:
+        res = '![](/uploads/%s/%s)' % (state['slug'], img_file_ru) + \
+            state['line_break']
+    else:
+        res = '![](/uploads/%s/%s "%s")' % (state['slug'], img_file_ru, \
+            title_text) + state['line_break']
     res += '[labels]' + state['line_break']
     res += 'TODO' + state['line_break']
     res += '[/labels]' + state['line_break']

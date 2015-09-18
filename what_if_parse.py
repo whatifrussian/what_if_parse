@@ -139,7 +139,7 @@ def process_toplevel_a(a_elem, state):
     num = int(url.rstrip('/').rsplit('/', 1)[1])
 
     state['slug'] = str(num).rjust(3, '0') + '-' + title.lower() \
-        .replace(' ', '-').replace('.', '')
+        .replace(' ', '-').replace('.', '').replace(',', '')
 
     res = title + state['line_break']
     res += url + state['par_sep']

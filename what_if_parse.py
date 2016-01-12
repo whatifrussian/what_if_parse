@@ -244,6 +244,21 @@ def process_toplevel_p(p_elem, state):
     return res
 
 
+def process_toplevel_blockquote(elem, state):
+    """ Process toplevel <blockquote/> element (child of <article/>).
+
+    Detect non-inline formula. Dump paragraph footnotes after an element.
+
+    """
+    res = '> '
+    # TODO: check for formula only for entire fragment
+    res += maybe_formula(elem.text or '')
+    res += process_childs(elem, state)
+    res += state['par_sep']
+    res += pop_footnotes(state)
+    return res
+
+
 def process_toplevel_img(img, state):
     """ Process toplevel <img/> element (child of <article/>). """
     url = full_url(img.get('src'), context_url=state['base_url'])
@@ -310,6 +325,7 @@ def process_article(url, html):
     func_dict = {
         'a': process_toplevel_a,
         'p': process_toplevel_p,
+        'blockquote': process_toplevel_blockquote,
         'img': process_toplevel_img,
     }
     for child in article:

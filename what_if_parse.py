@@ -25,6 +25,12 @@ class GetPageError(Exception):
     pass
 
 
+# req.content used instead of req.text for passing content to lxml.
+# It helps to avoid failing lxml with the following message:
+# > ValueError: Unicode strings with encoding declaration are not
+# > supported. Please use bytes input or XML fragments without
+# > declaration.
+# Related discussion: http://stackoverflow.com/a/25023776
 def get_page(url, utf8=False):
     """ Get HTML page or raise GetPageError exception.
 
@@ -49,7 +55,7 @@ def get_page(url, utf8=False):
         req.encoding = 'utf-8'
     content_type = req.headers['content-type']
     if content_type.startswith('text/html'):
-        return req.text
+        return req.content
     else:
         print('[get_page] Content type "%s" != "text/html"; url: %s' % \
             (content_type, url), file=sys.stderr)

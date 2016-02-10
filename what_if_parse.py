@@ -451,7 +451,7 @@ def get_args():
             args['native_newline'] = True
         elif a.isdigit():
             if url:
-                logging.crtical('An article number found at least twice in arguments')
+                logging.critical('An article number found at least twice in arguments')
                 usage()
                 exit(EXIT_WRONG_ARGS)
             else:

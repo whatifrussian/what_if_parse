@@ -30,7 +30,12 @@ NOTABENOID_SPACES_WORKAROUND = True
 
 class GetPageError(Exception):
     """ The exception raised when smth went wrong in 'get_page' function. """
-    pass
+    def __init__(self, desc, url):
+        self.desc = desc
+        self.url = url
+    def __str__(self):
+        tmpl = 'The error "%s" occured while getting the page %s'
+        return tmpl % (self.desc, self.url)
 
 
 # req.content used instead of req.text for passing content to lxml.
@@ -52,13 +57,11 @@ def get_page(url, utf8=False):
     try:
         req = requests.get(url, headers={'Accept': 'text/html'})
     except (RequestException, BaseHTTPError):
-        print('[get_page] Exception occured at http request performing: ' \
-            + url, file=sys.stderr)
-        raise GetPageError()
+        err = 'HTTP request failed and error code isn\'t available'
+        raise GetPageError(err, url)
     if req.status_code != requests.codes.ok:
-        print('[get_page] HTTP status code: %d; url: %s' % \
-            (req.status_code, url), file=sys.stderr)
-        raise GetPageError()
+        err = 'HTTP status code is %d' % req.status_code
+        raise GetPageError(err, url)
     if utf8:
         req.encoding = 'utf-8'
         return req.content
@@ -67,32 +70,34 @@ def get_page(url, utf8=False):
         content_type_re = r'^text/html; charset=(?P<charset>[A-Za-z0-9_-]+)$'
         m_html = re.match(content_type_re, content_type)
         if not m_html:
-            print('[get_page] Content type "%s" != "text/html"; url: %s' % \
-                (content_type, url), file=sys.stderr)
-            raise GetPageError()
+            err = 'Content type "%s" isn\'t "text/html"' % content_type
+            raise GetPageError(err, url)
         charset = m_html.group('charset')
         try:
             codec = codecs.lookup(charset)
         except codecs.LookupError:
-            print('[get_page] Error during lookup codec %s for page %s' % \
-                (charset, url), file=sys.stderr)
+            err = 'Looking up codec for "%s" failed' % charset
+            raise GetPageError(err, url)
         return codec.decode(req.content)[0]
+    # pylint: enable=E1101
 
 
 def get_title(reference, refs_cnt, default_res='TODO'):
-    """ Get title of page by its url.
+    """ Get a title of a page by its url.
 
-    Download page from reference['url'] and extract title. If some error
-    occured, 'default_res' value returned.
+    Download page from reference['url'] and extract title. If an error
+    occured during page download or title cannot be extracted, returns
+    a value of 'default_res' argument.
 
     """
     header = '[get_title %d/%d] ' % (reference['num'], refs_cnt)
     print(header + 'Download page from %s' % reference['url'], file=sys.stderr)
     try:
         html = get_page(reference['url'])
-    except GetPageError:
-        print(header + 'Skip title extracting: get page error or wrong html page', \
-            file=sys.stderr)
+    except GetPageError as exc:
+        print('==== Error during getting page ====', file=sys.stderr)
+        print(str(exc), file=sys.stderr)
+        print('==== But we will continue anyway ====', file=sys.stderr)
         return default_res
     print(header + 'Extract title from the page', file=sys.stderr)
     doc = lxml.html.document_fromstring(html)
@@ -332,13 +337,7 @@ def postprocess_references(state):
     res = ''
     refs_cnt = len(state['references'])
     for reference in state['references']:
-        try:
-            title_text = get_title(reference, refs_cnt).replace('"', '\\"')
-        except Exception as e:
-            print('==== Error during getting page title ====', file=sys.stderr)
-            print(str(e), file=sys.stderr)
-            print('==== But we will continue anyway ====', file=sys.stderr)
-            title_text = 'TODO'
+        title_text = get_title(reference, refs_cnt).replace('"', '\\"')
         res += '[%s]: %s "%s"' % (reference['num'], reference['url'], \
             title_text) + state['par_sep']
     return res

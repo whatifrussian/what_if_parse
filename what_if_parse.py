@@ -30,12 +30,17 @@ NOTABENOID_SPACES_WORKAROUND = True
 
 class GetPageError(Exception):
     """ The exception raised when smth went wrong in 'get_page' function. """
-    def __init__(self, desc, url):
+    def __init__(self, desc, url, more=None):
         self.desc = desc
         self.url = url
+        self.more = more
     def __str__(self):
-        tmpl = 'The error "%s" occured while getting the page %s'
-        return tmpl % (self.desc, self.url)
+        tmpl = 'The error "%s" occured while getting the page %s%s'
+        if self.more:
+            more_str = '; ' + str(self.more)
+        else:
+            more_str = ''
+        return tmpl % (self.desc, self.url, more_str)
 
 
 # req.content used instead of req.text for passing content to lxml.
@@ -57,11 +62,12 @@ def get_page(url, utf8=False):
     try:
         req = requests.get(url, headers={'Accept': 'text/html'})
     except (RequestException, BaseHTTPError):
-        err = 'HTTP request failed and error code isn\'t available'
+        err = 'HTTP request failed before status code become available'
         raise GetPageError(err, url)
     if req.status_code != requests.codes.ok:
-        err = 'HTTP status code is %d' % req.status_code
-        raise GetPageError(err, url)
+        err = 'HTTP request failed'
+        more = {'status_code': req.status_code}
+        raise GetPageError(err, url, more)
     if utf8:
         req.encoding = 'utf-8'
         return req.content
@@ -70,14 +76,16 @@ def get_page(url, utf8=False):
         content_type_re = r'^text/html; charset=(?P<charset>[A-Za-z0-9_-]+)$'
         m_html = re.match(content_type_re, content_type)
         if not m_html:
-            err = 'Content type "%s" isn\'t "text/html"' % content_type
-            raise GetPageError(err, url)
+            err = 'Content type isn\'t matched as "text/html"'
+            more = {'content_type': content_type}
+            raise GetPageError(err, url, more)
         charset = m_html.group('charset')
         try:
             codec = codecs.lookup(charset)
         except codecs.LookupError:
-            err = 'Looking up codec for "%s" failed' % charset
-            raise GetPageError(err, url)
+            err = 'Looking up codec failed'
+            more = {'charset': charset}
+            raise GetPageError(err, url, more)
         return codec.decode(req.content)[0]
     # pylint: enable=E1101
 
@@ -451,8 +459,11 @@ def download_article(url):
     print('Download article from %s' % url, file=sys.stderr)
     try:
         html = get_page(url, utf8=True)
-    except GetPageError:
-        print('Error when getting page, exitting...', file=sys.stderr)
+    except GetPageError as exc:
+        print('==== Following error occured when getting page ====', \
+            file=sys.stderr)
+        print(str(exc), file=sys.stderr)
+        print('==== Exiting ===', file=sys.stderr)
         exit(EXIT_GET_PAGE_ERROR)
     return html
 

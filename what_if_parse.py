@@ -438,13 +438,16 @@ def get_args():
     url = None
     args = {
         'native_newline': False,
+        'verbose': False,
     }
 
     for a in sys.argv[1:]:
         if a in ('--help', '-h', '-?'):
             usage(file=sys.stdout)
             exit(EXIT_SUCCESS)
-        if a == '--native-newline':
+        elif a in ('--verbose', '-v'):
+            args['verbose'] = True
+        elif a == '--native-newline':
             args['native_newline'] = True
         elif a.isdigit():
             if url:
@@ -461,6 +464,11 @@ def get_args():
     if not url:
         url = 'http://what-if.xkcd.com'
     # args['native_newline'] is already False
+
+    # Processing some arguments here
+    if args['verbose']:
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.INFO)
 
     return (url, args)
 

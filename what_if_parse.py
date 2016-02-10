@@ -24,6 +24,10 @@ EXIT_WRONG_ARGS = 1
 EXIT_GET_PAGE_ERROR = 2
 
 
+# Notabenoid doesn't display spaces at start of a line.
+NOTABENOID_SPACES_WORKAROUND = True
+
+
 class GetPageError(Exception):
     """ The exception raised when smth went wrong in 'get_page' function. """
     pass
@@ -145,8 +149,14 @@ def pop_footnotes(state):
     """ Get preparsed footnotes text and flush it. """
     res = ''
     for footnote in state['footnotes']:
-        res += '[^%s]: %s' % (footnote['num'], footnote['body']) + \
-            state['par_sep']
+        if footnote['is_multipar']:
+            template = '[^%s]:\n%s'
+            if NOTABENOID_SPACES_WORKAROUND:
+                template = 'TODO: replace \'<-->\' with \'    \'\n' + template
+        else:
+            template = '[^%s]: %s'
+        res += template % (footnote['num'], footnote['body'])
+        res += state['par_sep']
     state['footnotes'] = []
     return res
 
@@ -200,6 +210,10 @@ def process_childs(elem, state, em_mark='*', strong_mark='**'):
             res += '<sup>'
             res += process_childs(child, state)
             res += '</sup>'
+        elif child.tag == 'br':
+            res += state['par_sep']
+        elif child.tag == 'img':
+            res += process_img(child, state)
         else:
             res += lxml.html.tostring(child, encoding='unicode')
             tail_added = True
@@ -223,9 +237,19 @@ def process_span(span, state):
     refbody = span.xpath('./span[@class="refbody"]')[0]
     # TODO: formulas in footnotes?
     refbody_parsed = process_childs(refbody, state).strip()
+    is_multipar = state['par_sep'] in refbody_parsed
+    if is_multipar:
+        new_refbody = ''
+        refbody_pars = refbody_parsed.split(state['par_sep'])
+        for par in refbody_pars:
+            for line in par.split(state['line_break']):
+                new_refbody += state['indent'] + line + state['line_break']
+            new_refbody = new_refbody.rstrip() + state['par_sep']
+        refbody_parsed = new_refbody.rstrip()
     footnote = {
         'num': state['fn_counter'],
         'body': refbody_parsed,
+        'is_multipar': is_multipar,
     }
     state['footnotes'].append(footnote)
     state['fn_counter'] += 1
@@ -322,16 +346,21 @@ def postprocess_references(state):
 
 def new_parser(url):
     """ Return new (clean) parser state. """
-    return {
+    state = {
         'slug': None,
         'base_url': url,
         'ref_counter': 1,
         'fn_counter': 1,
         'par_sep': '\n\n',
         'line_break': '\n',
+        'indent': ' ' * 4,
         'footnotes': [],
         'references': [],
     }
+    if NOTABENOID_SPACES_WORKAROUND:
+        state['indent'] = '<-->'
+    return state
+
 
 
 def process_article(url, html):

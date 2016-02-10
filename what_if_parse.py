@@ -501,6 +501,16 @@ def save_article(slug, native_newline, a_html, a_md):
         f.write(a_md + '\n')
 
 
+def prettify_logging():
+    # TODO: colors when isatty()
+    root_logger = logging.getLogger()
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter(
+        '{asctime} {levelname:4s} {message}', style='{')
+    handler.setFormatter(formatter)
+    root_logger.addHandler(handler)
+
+
 def main():
     """ Main actions sequence.
 
@@ -508,6 +518,7 @@ def main():
     to files.
 
     """
+    prettify_logging()
     url, args = get_args()
     html = download_article(url)
     a_html, a_md, slug = process_article(url, html)

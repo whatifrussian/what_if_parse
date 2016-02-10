@@ -14,7 +14,9 @@ $ ./what_if_parse [num]
 
 Where `num` is optional article number for grabbing. If it ommited, last article will grabbed.
 
-Resulting HTML and Markdown will saved into files like `001-relativistic-baseball.html` and `001-relativistic-baseball.md`.
+More options described in the cheatsheet, which can be displayed by `./what_if_parse --help`.
+
+Resulting HTML and Markdown will saved into files like `001-relativistic-baseball-20160210-232959+0300.html` and `001-relativistic-baseball-20160210-232959+0300.html`. A timestamp added for simplify tracking changes.
 
 ## License
 

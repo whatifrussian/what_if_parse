@@ -15,6 +15,7 @@ from requests.exceptions import RequestException, BaseHTTPError
 import lxml.html
 import io
 import logging
+from datetime import tzinfo, timedelta, datetime;
 
 
 EXIT_SUCCESS = 0
@@ -24,6 +25,15 @@ EXIT_GET_PAGE_ERROR = 2
 
 # Notabenoid doesn't display spaces at start of a line.
 NOTABENOID_SPACES_WORKAROUND = True
+# Avoid hardcoding here is pretty awkward as I remember.
+TIMEZONE_OFFSET_HOURS = 3
+
+
+class TZ(tzinfo):
+    def utcoffset(self, dt):
+        return timedelta(hours=TIMEZONE_OFFSET_HOURS)
+    def dst(self, dt):
+        return timedelta(hours=TIMEZONE_OFFSET_HOURS)
 
 
 class GetPageError(Exception):
@@ -410,6 +420,9 @@ def usage(file=sys.stderr):
    print('\
 Usage: %s [options] [num]\n\
 \n\
+The script will generate two files with naming scheme\n\
+{num}-{title}-{timestamp}.{html,md}\n\
+\n\
 Available options are the following.\n\
 \n\
 --native-newline  Don\'t replace native end of line character (EOL)\n\
@@ -465,8 +478,10 @@ def download_article(url):
 
 
 def save_article(slug, native_newline, a_html, a_md):
-    html_file = slug + '.html'
-    md_file = slug + '.md'
+    tmpl = '%s-%s.%s'
+    timestamp = datetime.now(TZ()).strftime('%Y%m%d-%H%M%S%z')
+    html_file = tmpl % (slug, timestamp, 'html')
+    md_file = tmpl % (slug, timestamp, 'md')
 
     # http://stackoverflow.com/a/23434608
     newline = None if native_newline else ''

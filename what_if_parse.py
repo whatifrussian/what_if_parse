@@ -11,6 +11,8 @@ The module defines set of functions for downloading and parsing articles from
 # * --quiet|-q option for disabling progress reports
 
 import sys
+import re
+import codecs
 import requests
 from requests.exceptions import RequestException, BaseHTTPError
 import lxml.html
@@ -53,13 +55,22 @@ def get_page(url, utf8=False):
         raise GetPageError()
     if utf8:
         req.encoding = 'utf-8'
-    content_type = req.headers['content-type']
-    if content_type.startswith('text/html'):
         return req.content
     else:
-        print('[get_page] Content type "%s" != "text/html"; url: %s' % \
-            (content_type, url), file=sys.stderr)
-        raise GetPageError()
+        content_type = req.headers['content-type']
+        content_type_re = r'^text/html; charset=(?P<charset>[A-Za-z0-9_-]+)$'
+        m_html = re.match(content_type_re, content_type)
+        if not m_html:
+            print('[get_page] Content type "%s" != "text/html"; url: %s' % \
+                (content_type, url), file=sys.stderr)
+            raise GetPageError()
+        charset = m_html.group('charset')
+        try:
+            codec = codecs.lookup(charset)
+        except codecs.LookupError:
+            print('[get_page] Error during lookup codec %s for page %s' % \
+                (charset, url), file=sys.stderr)
+        return codec.decode(req.content)[0]
 
 
 def get_title(reference, refs_cnt, default_res='TODO'):

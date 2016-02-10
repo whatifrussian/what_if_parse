@@ -416,21 +416,18 @@ Available options are the following.\n\
        sys.argv[0], file=file)
 
 
-def main():
-    """ Main actions sequence.
-
-    Get and check arguments, call downloading and parsing functions, write
-    results to files.
-
-    """
+def get_args():
     url = None
-    native_newline = False
+    args = {
+        'native_newline': False,
+    }
+
     for a in sys.argv[1:]:
         if a in ('--help', '-h', '-?'):
             usage(file=sys.stdout)
             exit(EXIT_SUCCESS)
         if a == '--native-newline':
-            native_newline = True
+            args['native_newline'] = True
         elif a.isdigit():
             if url:
                 print('An article number found at least twice in arguments', \
@@ -446,31 +443,48 @@ def main():
     # Default values
     if not url:
         url = 'http://what-if.xkcd.com'
-    # native_newline False by default
+    # args['native_newline'] is already False
 
+    return (url, args)
+
+
+def download_article(url):
     print('Download article from %s' % url, file=sys.stderr)
     try:
         html = get_page(url, utf8=True)
     except GetPageError:
         print('Error when getting page, exitting...', file=sys.stderr)
         exit(EXIT_GET_PAGE_ERROR)
+    return html
 
-    article_html, article_md, slug = process_article(url, html)
 
+def save_article(slug, native_newline, a_html, a_md):
     html_file = slug + '.html'
     md_file = slug + '.md'
 
     # http://stackoverflow.com/a/23434608
-    eol = None if native_newline else ''
-    with io.open(html_file, 'w', encoding='utf-8', newline=eol) as html_file_fd:
+    newline = None if native_newline else ''
+    with io.open(html_file, 'w', encoding='utf-8', newline=newline) as html_file_fd:
         print('Write article in html to file %s' % html_file, \
             file=sys.stderr)
-        print(article_html, file=html_file_fd)
-    with open(md_file, 'w', encoding='utf-8', newline=eol) as md_file_fd:
+        print(a_html, file=html_file_fd)
+    with open(md_file, 'w', encoding='utf-8', newline=newline) as md_file_fd:
         print('Write article in markdown to file %s' % md_file, \
             file=sys.stderr)
-        print(article_md, file=md_file_fd)
+        print(a_md, file=md_file_fd)
 
+
+def main():
+    """ Main actions sequence.
+
+    Get and check arguments, call downloading and parsing functions, write
+    results to files.
+
+    """
+    url, args = get_args()
+    html = download_article(url)
+    a_html, a_md, slug = process_article(url, html)
+    save_article(slug, args['native_newline'], a_html, a_md)
 
 if __name__ == '__main__':
     main()

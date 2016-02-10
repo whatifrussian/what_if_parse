@@ -7,9 +7,6 @@ The module defines set of functions for downloading and parsing articles from
 
 """
 
-# TODO's residence:
-# * --quiet|-q option for disabling progress reports
-
 import sys
 import re
 import codecs
@@ -17,6 +14,7 @@ import requests
 from requests.exceptions import RequestException, BaseHTTPError
 import lxml.html
 import io
+import logging
 
 
 EXIT_SUCCESS = 0
@@ -98,16 +96,16 @@ def get_title(reference, refs_cnt, default_res='TODO'):
     a value of 'default_res' argument.
 
     """
-    header = '[get_title %d/%d] ' % (reference['num'], refs_cnt)
-    print(header + 'Download page from %s' % reference['url'], file=sys.stderr)
+    log_header = '[get_title %d/%d] ' % (reference['num'], refs_cnt)
+    logging.info(log_header + 'Download page from %s' % reference['url'])
     try:
         html = get_page(reference['url'])
     except GetPageError as exc:
-        print('==== Error during getting page ====', file=sys.stderr)
-        print(str(exc), file=sys.stderr)
-        print('==== But we will continue anyway ====', file=sys.stderr)
+        logging.warn('==== Error during getting page ====')
+        logging.warn(str(exc))
+        logging.warn('==== But we will continue anyway ====')
         return default_res
-    print(header + 'Extract title from the page', file=sys.stderr)
+    logging.info(log_header + 'Extract title from the page')
     doc = lxml.html.document_fromstring(html)
     titles = doc.xpath('//title')
     if len(titles) == 0:
@@ -394,15 +392,15 @@ def process_article(url, html):
         'img': process_toplevel_img,
     }
     for child in article:
-        print('Processed %d/%d top level elements' % (childs_processed, \
-            childs_cnt), file=sys.stderr)
+        logging.info('Processed %d/%d top level elements' % \
+            (childs_processed, childs_cnt))
         if child.tag in func_dict.keys():
             res += func_dict[child.tag](child, state)
         else:
-            print('Unexpected toplevel element: ' + child.tag, file=sys.stderr)
+            logging.warn('Unexpected toplevel element: ' + child.tag)
         childs_processed += 1
 
-    print('Postprocessing references...', file=sys.stderr)
+    logging.info('Postprocessing references...')
     res += postprocess_references(state)
 
     return article_html, res.strip(), state['slug']
@@ -437,8 +435,7 @@ def get_args():
             args['native_newline'] = True
         elif a.isdigit():
             if url:
-                print('An article number found at least twice in arguments', \
-                    file=sys.stderr)
+                logging.crtical('An article number found at least twice in arguments')
                 usage()
                 exit(EXIT_WRONG_ARGS)
             else:
@@ -456,14 +453,13 @@ def get_args():
 
 
 def download_article(url):
-    print('Download article from %s' % url, file=sys.stderr)
+    logging.info('Download article from %s' % url)
     try:
         html = get_page(url, utf8=True)
     except GetPageError as exc:
-        print('==== Following error occured when getting page ====', \
-            file=sys.stderr)
-        print(str(exc), file=sys.stderr)
-        print('==== Exiting ===', file=sys.stderr)
+        logging.critical('==== Following error occured when getting page ====')
+        logging.critical(str(exc))
+        logging.critical('==== Exiting ===')
         exit(EXIT_GET_PAGE_ERROR)
     return html
 
@@ -474,14 +470,12 @@ def save_article(slug, native_newline, a_html, a_md):
 
     # http://stackoverflow.com/a/23434608
     newline = None if native_newline else ''
-    with io.open(html_file, 'w', encoding='utf-8', newline=newline) as html_file_fd:
-        print('Write article in html to file %s' % html_file, \
-            file=sys.stderr)
-        print(a_html, file=html_file_fd)
-    with open(md_file, 'w', encoding='utf-8', newline=newline) as md_file_fd:
-        print('Write article in markdown to file %s' % md_file, \
-            file=sys.stderr)
-        print(a_md, file=md_file_fd)
+    with io.open(html_file, 'w', encoding='utf-8', newline=newline) as f:
+        logging.info('Write article in html to file %s' % html_file)
+        f.write(a_html + '\n')
+    with open(md_file, 'w', encoding='utf-8', newline=newline) as f:
+        logging.info('Write article in markdown to file %s' % md_file)
+        f.write(a_md + '\n')
 
 
 def main():

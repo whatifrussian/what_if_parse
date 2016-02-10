@@ -16,8 +16,10 @@ import codecs
 import requests
 from requests.exceptions import RequestException, BaseHTTPError
 import lxml.html
+import io
 
 
+EXIT_SUCCESS = 0
 EXIT_WRONG_ARGS = 1
 EXIT_GET_PAGE_ERROR = 2
 
@@ -370,6 +372,21 @@ def process_article(url, html):
     return article_html, res.strip(), state['slug']
 
 
+def usage(file=sys.stderr):
+   print('\
+Usage: %s [options] [num]\n\
+\n\
+Available options are the following.\n\
+\n\
+--native-newline  Don\'t replace native end of line character (EOL)\n\
+                  with LF, which used by default. Be careful, native\n\
+                  EOL can be painful when you try to diff\'ing changes\n\
+                  across several OSes.\n\
+\n\
+--help | -h | -?  Display this cheatsheet.' % \
+       sys.argv[0], file=file)
+
+
 def main():
     """ Main actions sequence.
 
@@ -377,13 +394,30 @@ def main():
     results to files.
 
     """
-    if len(sys.argv) == 1:
+    url = None
+    native_newline = False
+    for a in sys.argv[1:]:
+        if a in ('--help', '-h', '-?'):
+            usage(file=sys.stdout)
+            exit(EXIT_SUCCESS)
+        if a == '--native-newline':
+            native_newline = True
+        elif a.isdigit():
+            if url:
+                print('An article number found at least twice in arguments', \
+                    file=sys.stderr)
+                usage()
+                exit(EXIT_WRONG_ARGS)
+            else:
+                url = 'http://what-if.xkcd.com/' + a.lstrip('0')
+        else:
+            usage()
+            exit(EXIT_WRONG_ARGS)
+
+    # Default values
+    if not url:
         url = 'http://what-if.xkcd.com'
-    elif len(sys.argv) == 2 and sys.argv[1].isdigit():
-        url = 'http://what-if.xkcd.com/' + sys.argv[1].lstrip('0')
-    else:
-        print('Usage: %s [num]' % sys.argv[0], file=sys.stderr)
-        exit(EXIT_WRONG_ARGS)
+    # native_newline False by default
 
     print('Download article from %s' % url, file=sys.stderr)
     try:
@@ -397,11 +431,13 @@ def main():
     html_file = slug + '.html'
     md_file = slug + '.md'
 
-    with open(html_file, 'w', encoding='utf-8') as html_file_fd:
+    # http://stackoverflow.com/a/23434608
+    eol = None if native_newline else ''
+    with io.open(html_file, 'w', encoding='utf-8', newline=eol) as html_file_fd:
         print('Write article in html to file %s' % html_file, \
             file=sys.stderr)
         print(article_html, file=html_file_fd)
-    with open(md_file, 'w', encoding='utf-8') as md_file_fd:
+    with open(md_file, 'w', encoding='utf-8', newline=eol) as md_file_fd:
         print('Write article in markdown to file %s' % md_file, \
             file=sys.stderr)
         print(article_md, file=md_file_fd)

@@ -297,12 +297,22 @@ def process_toplevel_img(img, state):
     return res
 
 
+def process_img(img, state):
+    return process_toplevel_img(img, state)
+
+
 def postprocess_references(state):
     """ Format and return preparsed references. """
     res = ''
     refs_cnt = len(state['references'])
     for reference in state['references']:
-        title_text = get_title(reference, refs_cnt).replace('"', '\\"')
+        try:
+            title_text = get_title(reference, refs_cnt).replace('"', '\\"')
+        except Exception as e:
+            print('==== Error during getting page title ====', file=sys.stderr)
+            print(str(e), file=sys.stderr)
+            print('==== But we will continue anyway ====', file=sys.stderr)
+            title_text = 'TODO'
         res += '[%s]: %s "%s"' % (reference['num'], reference['url'], \
             title_text) + state['par_sep']
     return res

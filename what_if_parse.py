@@ -496,14 +496,15 @@ def save_article(slug, native_newline, a_html, a_md):
 def main():
     """ Main actions sequence.
 
-    Get and check arguments, call downloading and parsing functions, write
-    results to files.
+    Get and check arguments, download and parse article, write results
+    to files.
 
     """
     url, args = get_args()
     html = download_article(url)
     a_html, a_md, slug = process_article(url, html)
     save_article(slug, args['native_newline'], a_html, a_md)
+
 
 if __name__ == '__main__':
     main()

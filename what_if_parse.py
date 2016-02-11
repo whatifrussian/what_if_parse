@@ -7,6 +7,19 @@ The module defines set of functions for downloading and parsing articles from
 
 """
 
+
+# TODO's:
+# * Add an option for only checking if new article published. Need caching
+#   last article number in a file. Need properly documenting it.
+# * Maybe add an option for disable downloading pages for title extracting
+#   (for example when it produces unexpected errors).
+# * Add an markdown text to Notabenoid.
+# * Add an option for sending notification to our mailing list and our
+#   groupchat if particular event occured (e.g. new article found or new
+#   article landed to Notabenoid).
+# * Write instruction about deployment using cron.
+
+
 import sys
 import re
 import codecs

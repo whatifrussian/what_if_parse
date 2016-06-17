@@ -27,12 +27,12 @@ The module defines set of functions for downloading and parsing articles from
 import sys
 import re
 import codecs
-import requests
-from requests.exceptions import RequestException, BaseHTTPError
-import lxml.html
 import io
 import logging
-from datetime import tzinfo, timedelta, datetime;
+from datetime import tzinfo, timedelta, datetime
+import lxml.html
+import requests
+from requests.exceptions import RequestException, BaseHTTPError
 
 
 EXIT_SUCCESS = 0
@@ -47,15 +47,19 @@ TIMEZONE_OFFSET_HOURS = 3
 
 
 class TZ(tzinfo):
+    """ Hardcoded Moscow timezone """
     def utcoffset(self, dt):
         return timedelta(hours=TIMEZONE_OFFSET_HOURS)
     def dst(self, dt):
         return timedelta(hours=TIMEZONE_OFFSET_HOURS)
+    def tzname(self, dt):
+        return "MSK"
 
 
 class GetPageError(Exception):
     """ The exception raised when smth went wrong in 'get_page' function. """
     def __init__(self, desc, url, more=None):
+        Exception.__init__(self)
         self.desc = desc
         self.url = url
         self.more = more
@@ -81,15 +85,12 @@ def get_page(url, utf8=False):
     when download error occured.
 
     """
-    # Disable pylint error message for 'requests.code.ok':
-    # > Instance of 'LookupDict' has no 'ok' member (no-member)
-    # pylint: disable=E1101
     try:
         req = requests.get(url, headers={'Accept': 'text/html'})
     except (RequestException, BaseHTTPError):
         err = 'HTTP request failed before status code become available'
         raise GetPageError(err, url)
-    if req.status_code != requests.codes.ok:
+    if req.status_code != requests.codes['ok']:
         err = 'HTTP request failed'
         more = {'status_code': req.status_code}
         raise GetPageError(err, url, more)
@@ -112,7 +113,6 @@ def get_page(url, utf8=False):
             more = {'charset': charset}
             raise GetPageError(err, url, more)
         return codec.decode(req.content)[0]
-    # pylint: enable=E1101
 
 
 def get_title(reference, refs_cnt, default_res='TODO'):
@@ -124,13 +124,13 @@ def get_title(reference, refs_cnt, default_res='TODO'):
 
     """
     log_header = '[get_title %d/%d] ' % (reference['num'], refs_cnt)
-    logging.info(log_header + 'Download page from %s' % reference['url'])
+    logging.info(log_header + 'Download page from %s', reference['url'])
     try:
         html = get_page(reference['url'])
     except GetPageError as exc:
-        logging.warn('==== Error during getting page ====')
-        logging.warn(str(exc))
-        logging.warn('==== But we will continue anyway ====')
+        logging.warning('==== Error during getting page ====')
+        logging.warning(str(exc))
+        logging.warning('==== But we will continue anyway ====')
         return default_res
     logging.info(log_header + 'Extract title from the page')
     doc = lxml.html.document_fromstring(html)
@@ -362,6 +362,10 @@ def process_toplevel_img(img, state):
 
 
 def process_img(img, state):
+    """ Hack for correctly handle for images in multiparagraph
+    footnotes.
+
+    """
     return process_toplevel_img(img, state)
 
 
@@ -419,12 +423,12 @@ def process_article(url, html):
         'img': process_toplevel_img,
     }
     for child in article:
-        logging.info('Processed %d/%d top level elements' % \
-            (childs_processed, childs_cnt))
+        logging.info('Processed %d/%d top level elements', \
+            childs_processed, childs_cnt)
         if child.tag in func_dict.keys():
             res += func_dict[child.tag](child, state)
         else:
-            logging.warn('Unexpected toplevel element: ' + child.tag)
+            logging.warning('Unexpected toplevel element: ' + child.tag)
         childs_processed += 1
 
     logging.info('Postprocessing references...')
@@ -434,7 +438,8 @@ def process_article(url, html):
 
 
 def usage(file=sys.stderr):
-   print('\
+    """ Print info how to use the script. """
+    print('\
 Usage: %s [options] [num]\n\
 \n\
 The script will generate two files with naming scheme\n\
@@ -452,6 +457,10 @@ Available options are the following.\n\
 
 
 def get_args():
+    """ Return URL and flags to process, set logging level. Print
+    help and exit when user ask to help or provide wrong arguments.
+
+    """
     url = None
     args = {
         'native_newline': False,
@@ -491,7 +500,11 @@ def get_args():
 
 
 def download_article(url):
-    logging.info('Download article from %s' % url)
+    """ Return string with HTML of requested article or exit with
+    an error.
+
+    """
+    logging.info('Download article from %s', url)
     try:
         html = get_page(url, utf8=True)
     except GetPageError as exc:
@@ -503,6 +516,7 @@ def download_article(url):
 
 
 def save_article(slug, native_newline, a_html, a_md):
+    """ Write resulting HTML and Markdown to appropriate files. """
     tmpl = '%s-%s.%s'
     timestamp = datetime.now(TZ()).strftime('%Y%m%d-%H%M%S%z')
     html_file = tmpl % (slug, timestamp, 'html')
@@ -511,14 +525,15 @@ def save_article(slug, native_newline, a_html, a_md):
     # http://stackoverflow.com/a/23434608
     newline = None if native_newline else ''
     with io.open(html_file, 'w', encoding='utf-8', newline=newline) as f:
-        logging.info('Write article in html to file %s' % html_file)
+        logging.info('Write article in html to file %s', html_file)
         f.write(a_html + '\n')
     with open(md_file, 'w', encoding='utf-8', newline=newline) as f:
-        logging.info('Write article in markdown to file %s' % md_file)
+        logging.info('Write article in markdown to file %s', md_file)
         f.write(a_md + '\n')
 
 
 def prettify_logging():
+    """ Setup logger format. """
     # TODO: colors when isatty()
     root_logger = logging.getLogger()
     handler = logging.StreamHandler()

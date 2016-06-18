@@ -25,8 +25,6 @@ The module defines set of functions for downloading and parsing articles from
 
 
 import sys
-import re
-import codecs
 import io
 import logging
 from datetime import tzinfo, timedelta, datetime
@@ -72,13 +70,12 @@ class GetPageError(Exception):
         return tmpl % (self.desc, self.url, more_str)
 
 
-# req.content used instead of req.text for passing content to lxml.
-# It helps to avoid failing lxml with the following message:
-# > ValueError: Unicode strings with encoding declaration are not
-# > supported. Please use bytes input or XML fragments without
-# > declaration.
+# It always returns HTML content in it's original encoding, so you should
+# decode resulting string manually (e.g. using 'codecs' module) when you
+# intent to process HTML manually. When lxml used to parse HTML, it decodes
+# HTML string itself according to 'content-type' attribute in 'meta' tag.
 # Related discussion: http://stackoverflow.com/a/25023776
-def get_page(url, utf8=False):
+def get_page(url):
     """ Get HTML page or raise GetPageError exception.
 
     If content-type header isn't 'text/html' the exception raised as well as
@@ -94,25 +91,7 @@ def get_page(url, utf8=False):
         err = 'HTTP request failed'
         more = {'status_code': req.status_code}
         raise GetPageError(err, url, more)
-    if utf8:
-        req.encoding = 'utf-8'
-        return req.content
-    else:
-        content_type = req.headers['content-type']
-        content_type_re = r'^text/html; charset=(?P<charset>[A-Za-z0-9_-]+)$'
-        m_html = re.match(content_type_re, content_type)
-        if not m_html:
-            err = 'Content type isn\'t matched as "text/html"'
-            more = {'content_type': content_type}
-            raise GetPageError(err, url, more)
-        charset = m_html.group('charset')
-        try:
-            codec = codecs.lookup(charset)
-        except codecs.LookupError:
-            err = 'Looking up codec failed'
-            more = {'charset': charset}
-            raise GetPageError(err, url, more)
-        return codec.decode(req.content)[0]
+    return req.content
 
 
 def get_title(reference, refs_cnt, default_res='TODO'):
@@ -506,7 +485,8 @@ def download_article(url):
     """
     logging.info('Download article from %s', url)
     try:
-        html = get_page(url, utf8=True)
+        # We know that what-if articles always in UTF-8.
+        html = get_page(url)
     except GetPageError as exc:
         logging.critical('==== Following error occured when getting page ====')
         logging.critical(str(exc))

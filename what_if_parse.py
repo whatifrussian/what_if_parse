@@ -70,28 +70,44 @@ class GetPageError(Exception):
         return tmpl % (self.desc, self.url, more_str)
 
 
+def is_text_html(url):
+    try:
+        res = requests.head(url)
+    except (RequestException, BaseHTTPError):
+        err = 'HTTP HEAD request failed before status code become available'
+        raise GetPageError(err, url)
+    if res.status_code != requests.codes['ok']:
+        err = 'HTTP HEAD request failed'
+        more = {'status_code': res.status_code}
+        raise GetPageError(err, url, more)
+    return res.headers['Content-Type'].startswith('text/html')
+
+
 # It always returns HTML content in it's original encoding, so you should
 # decode resulting string manually (e.g. using 'codecs' module) when you
 # intent to process HTML manually. When lxml used to parse HTML, it decodes
 # HTML string itself according to 'content-type' attribute in 'meta' tag.
 # Related discussion: http://stackoverflow.com/a/25023776
-def get_page(url):
+def get_page(url, check_is_text_html=True):
     """ Get HTML page or raise GetPageError exception.
 
     If content-type header isn't 'text/html' the exception raised as well as
     when download error occured.
 
     """
-    try:
-        req = requests.get(url, headers={'Accept': 'text/html'})
-    except (RequestException, BaseHTTPError):
-        err = 'HTTP request failed before status code become available'
+    if check_is_text_html and not is_text_html(url):
+        err = 'Content-Type is differs from text/html'
         raise GetPageError(err, url)
-    if req.status_code != requests.codes['ok']:
-        err = 'HTTP request failed'
-        more = {'status_code': req.status_code}
+    try:
+        res = requests.get(url)
+    except (RequestException, BaseHTTPError):
+        err = 'HTTP GET request failed before status code become available'
+        raise GetPageError(err, url)
+    if res.status_code != requests.codes['ok']:
+        err = 'HTTP GET request failed'
+        more = {'status_code': res.status_code}
         raise GetPageError(err, url, more)
-    return req.content
+    return res.content
 
 
 def get_title(reference, refs_cnt, default_res='TODO'):

@@ -88,16 +88,19 @@ def is_text_html(url):
 # intent to process HTML manually. When lxml used to parse HTML, it decodes
 # HTML string itself according to 'content-type' attribute in 'meta' tag.
 # Related discussion: http://stackoverflow.com/a/25023776
-def get_page(url, check_is_text_html=True):
+def get_page(url, raise_non_text_html=False):
     """ Get HTML page or raise GetPageError exception.
 
     If content-type header isn't 'text/html' the exception raised as well as
     when download error occured.
 
     """
-    if check_is_text_html and not is_text_html(url):
-        err = 'Content-Type is differs from text/html'
-        raise GetPageError(err, url)
+    if not is_text_html(url):
+        if raise_non_text_html:
+            err = 'Content-Type is differs from text/html'
+            raise GetPageError(err, url)
+        else:
+            return None
     try:
         res = requests.get(url)
     except (RequestException, BaseHTTPError):
@@ -126,6 +129,8 @@ def get_title(reference, refs_cnt, default_res='TODO'):
         logging.warning('==== Error during getting page ====')
         logging.warning(str(exc))
         logging.warning('==== But we will continue anyway ====')
+        return default_res
+    if html is None:
         return default_res
     logging.info(log_header + 'Extract title from the page')
     doc = lxml.html.document_fromstring(html)
@@ -501,8 +506,7 @@ def download_article(url):
     """
     logging.info('Download article from %s', url)
     try:
-        # We know that what-if articles always in UTF-8.
-        html = get_page(url)
+        html = get_page(url, raise_non_text_html=True)
     except GetPageError as exc:
         logging.critical('==== Following error occured when getting page ====')
         logging.critical(str(exc))

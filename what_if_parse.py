@@ -72,7 +72,7 @@ class GetPageError(Exception):
 
 def is_text_html(url):
     try:
-        res = requests.head(url)
+        res = requests.head(url, allow_redirects=True)
     except (RequestException, BaseHTTPError):
         err = 'HTTP HEAD request failed before status code become available'
         raise GetPageError(err, url)

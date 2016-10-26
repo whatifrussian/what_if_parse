@@ -481,7 +481,7 @@ def get_args():
                 usage()
                 exit(EXIT_WRONG_ARGS)
             else:
-                url = 'http://what-if.xkcd.com/' + a.lstrip('0')
+                url = 'http://what-if.xkcd.com/{num}/'.format(num=a.lstrip('0'))
         else:
             usage()
             exit(EXIT_WRONG_ARGS)

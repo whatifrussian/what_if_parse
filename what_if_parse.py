@@ -245,9 +245,13 @@ def process_childs(elem, state, em_mark='*', strong_mark='**'):
         elif child.tag == 'span':
             res += process_span(child, state)
         elif child.tag == 'sup':
-            res += '<sup>'
+            res += '^{'
             res += process_childs(child, state)
-            res += '</sup>'
+            res += '}'
+        elif child.tag == 'sub':
+            res += '_{'
+            res += process_childs(child, state)
+            res += '}'
         elif child.tag == 'br':
             res += state['par_sep']
         elif child.tag == 'img':

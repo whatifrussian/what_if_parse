@@ -121,14 +121,16 @@ def get_title(reference, refs_cnt, default_res='TODO'):
     a value of 'default_res' argument.
 
     """
+    def cannot_get_warning(reference, exc):
+        logging.warning('Cannot get a title for "%s": %s',
+                        reference['url'], str(exc))
+
     log_header = '[get_title %d/%d] ' % (reference['num'], refs_cnt)
     logging.info(log_header + 'Download page from %s', reference['url'])
     try:
         html = get_page(reference['url'])
     except GetPageError as exc:
-        logging.warning('==== Error during getting page ====')
-        logging.warning(str(exc))
-        logging.warning('==== But we will continue anyway ====')
+        cannot_get_warning(reference, exc)
         return default_res
     if html is None:
         return default_res
@@ -141,9 +143,7 @@ def get_title(reference, refs_cnt, default_res='TODO'):
     try:
         title = titles[0].text
     except UnicodeDecodeError as exc:
-        logging.warning('==== Error during getting page ====')
-        logging.warning(str(exc))
-        logging.warning('==== But we will continue anyway ====')
+        cannot_get_warning(reference, exc)
         return default_res
     for line in title.split('\n'):
         line = line.strip()

@@ -48,8 +48,10 @@ class TZ(tzinfo):
     """ Hardcoded Moscow timezone """
     def utcoffset(self, dt):
         return timedelta(hours=TIMEZONE_OFFSET_HOURS)
+
     def dst(self, dt):
         return timedelta(hours=TIMEZONE_OFFSET_HOURS)
+
     def tzname(self, dt):
         return "MSK"
 
@@ -61,6 +63,7 @@ class GetPageError(Exception):
         self.desc = desc
         self.url = url
         self.more = more
+
     def __str__(self):
         tmpl = 'The error "%s" occured while getting the page %s%s'
         if self.more:
@@ -360,11 +363,11 @@ def process_toplevel_img(img, state):
 
     title_text = img.get('title').replace('"', '\\"')
     if len(title_text) == 0:
-        res = '![](/uploads/%s/%s)' % (state['slug'], img_file_ru) + \
-            state['line_break']
+        res = '![](/uploads/%s/%s)' % \
+            (state['slug'], img_file_ru) + state['line_break']
     else:
-        res = '![](/uploads/%s/%s "%s")' % (state['slug'], img_file_ru, \
-            title_text) + state['line_break']
+        res = '![](/uploads/%s/%s "%s")' % \
+            (state['slug'], img_file_ru, title_text) + state['line_break']
     res += '[labels]' + state['line_break']
     res += 'TODO' + state['line_break']
     res += '[/labels]' + state['line_break']
@@ -386,8 +389,8 @@ def postprocess_references(state):
     refs_cnt = len(state['references'])
     for reference in state['references']:
         title_text = get_title(reference, refs_cnt).replace('"', '\\"')
-        res += '[%s]: %s "%s"' % (reference['num'], reference['url'], \
-            title_text) + state['par_sep']
+        res += '[%s]: %s "%s"' % \
+            (reference['num'], reference['url'], title_text) + state['par_sep']
     return res
 
 
@@ -407,7 +410,6 @@ def new_parser(url):
     if NOTABENOID_SPACES_WORKAROUND:
         state['indent'] = '<-->'
     return state
-
 
 
 def process_article(url, html):
@@ -434,8 +436,8 @@ def process_article(url, html):
         'img': process_toplevel_img,
     }
     for child in article:
-        logging.info('Processed %d/%d top level elements', \
-            childs_processed, childs_cnt)
+        logging.info('Processed %d/%d top level elements',
+                     childs_processed, childs_cnt)
         if child.tag in func_dict.keys():
             res += func_dict[child.tag](child, state)
         else:
@@ -463,8 +465,7 @@ Available options are the following.\n\
                   EOL can be painful when you try to diff\'ing changes\n\
                   across several OSes.\n\
 \n\
---help | -h | -?  Display this cheatsheet.' % \
-       sys.argv[0], file=file)
+--help | -h | -?  Display this cheatsheet.' % sys.argv[0], file=file)
 
 
 def get_args():
@@ -488,11 +489,13 @@ def get_args():
             args['native_newline'] = True
         elif a.isdigit():
             if url:
-                logging.critical('An article number found at least twice in arguments')
+                logging.critical(
+                    'An article number found at least twice in arguments')
                 usage()
                 exit(EXIT_WRONG_ARGS)
             else:
-                url = 'http://what-if.xkcd.com/{num}/'.format(num=a.lstrip('0'))
+                url = 'http://what-if.xkcd.com/{num}/'.format(
+                    num=a.lstrip('0'))
         else:
             usage()
             exit(EXIT_WRONG_ARGS)

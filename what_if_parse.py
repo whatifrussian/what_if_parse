@@ -138,7 +138,14 @@ def get_title(reference, refs_cnt, default_res='TODO'):
     if len(titles) == 0:
         return default_res
     res = ''
-    for line in titles[0].text.split('\n'):
+    try:
+        title = titles[0].text
+    except UnicodeDecodeError as exc:
+        logging.warning('==== Error during getting page ====')
+        logging.warning(str(exc))
+        logging.warning('==== But we will continue anyway ====')
+        return default_res
+    for line in title.split('\n'):
         line = line.strip()
         if len(line) > 0:
             res += line + ' '

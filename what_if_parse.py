@@ -328,9 +328,11 @@ def process_toplevel_p(p_elem, state):
     res = ''
     if is_question or is_attribute:
         res += '> '
-    # TODO: check for formula only for entire fragment
-    res += maybe_formula(p_elem.text or '')
-    res += process_childs(p_elem, state)
+    formula = maybe_formula(p_elem.text)
+    if formula:
+        res += formula
+    else:
+        res += process_childs(p_elem, state)
     if is_question:
         res += state['line_break'] + '>' + state['line_break']
     else:

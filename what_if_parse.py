@@ -328,7 +328,7 @@ def process_toplevel_p(p_elem, state):
     res = ''
     if is_question or is_attribute:
         res += '> '
-    formula = maybe_formula(p_elem.text)
+    formula = maybe_formula(p_elem.text or '')
     if formula:
         res += formula
     else:

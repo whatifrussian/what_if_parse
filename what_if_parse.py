@@ -225,10 +225,19 @@ def process_toplevel_a(a_elem, state):
 
 def process_a(a_elem, state):
     """ Process inline <a/> element (somewhere under <article/>). """
-    res = '[%s][%d]' % (inner_html(a_elem), state['ref_counter'])
+    res_tmpl = '[%s]' % inner_html(a_elem) + '[%d]'
+    cur_url = full_url(a_elem.get('href'), context_url=state['base_url'])
+
+    # check if we already have that URL (in case of two or more links to the
+    # same page)
+    for ref in state['references']:
+        if ref['url'] == cur_url:
+            return res_tmpl % ref['num']
+
+    res = res_tmpl % state['ref_counter']
     ref = {
         'num': state['ref_counter'],
-        'url': full_url(a_elem.get('href'), context_url=state['base_url']),
+        'url': cur_url,
     }
     state['references'].append(ref)
     state['ref_counter'] += 1

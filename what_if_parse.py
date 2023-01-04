@@ -42,6 +42,8 @@ EXIT_GET_PAGE_ERROR = 2
 NOTABENOID_SPACES_WORKAROUND = True
 # Avoid hardcoding here is pretty awkward as I remember.
 TIMEZONE_OFFSET_HOURS = 3
+# Avoid infinite freeze.
+HTTP_TIMEOUT = 10
 
 
 class TZ(tzinfo):
@@ -75,7 +77,7 @@ class GetPageError(Exception):
 
 def is_text_html(url):
     try:
-        res = requests.head(url, allow_redirects=True)
+        res = requests.head(url, allow_redirects=True, timeout=HTTP_TIMEOUT)
     except (RequestException, BaseHTTPError):
         err = 'HTTP HEAD request failed before status code become available'
         raise GetPageError(err, url)
@@ -105,7 +107,7 @@ def get_page(url, raise_non_text_html=False):
         else:
             return None
     try:
-        res = requests.get(url)
+        res = requests.get(url, timeout=HTTP_TIMEOUT)
     except (RequestException, BaseHTTPError):
         err = 'HTTP GET request failed before status code become available'
         raise GetPageError(err, url)

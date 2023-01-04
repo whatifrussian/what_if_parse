@@ -209,6 +209,19 @@ def inner_html(node, strip=True):
     return res
 
 
+def normalize_space(txt):
+    """ Replace any space character or a sequence of space characters with one
+    whitespace. It is similar to how a web browser interprets a text within an
+    HTML tag.
+
+    The idea comes from
+    https://github.com/stevenvachon/normalize-html-whitespace
+    """
+    if not txt:
+        return ''
+    return re.sub(r'[\f\n\r\t\v ]+', ' ', txt)
+
+
 def pop_footnotes(state):
     """ Get preparsed footnotes text and flush it. """
     res = ''
@@ -236,6 +249,11 @@ def slugify(num, title):
         .replace('$', '') \
         .replace(':', '')
     return '{}-{}'.format(num_zero_filled, title_slugified)
+
+
+def prefix_each_line(prefix, data):
+    lines = [(line + '\n') for line in data.split('\n')]
+    return prefix + prefix.join(lines).rstrip('\n')
 
 
 def process_article_title(doc, state):
@@ -270,7 +288,7 @@ def process_article_title(doc, state):
 
 def process_a(a_elem, state):
     """ Process inline <a/> element (somewhere under <article/>). """
-    txt = inner_html(a_elem)
+    txt = normalize_space(inner_html(a_elem))
     url = full_url(a_elem.get('href'), context_url=state['base_url'])
 
     # check if we already have that URL (in case of two or more links to the
@@ -291,15 +309,22 @@ def process_a(a_elem, state):
 
 def process_childs(elem, state, em_mark='*', strong_mark='**'):
     """ Process some inline HTML element (somewhere under <article/>). """
-    res = elem.text or ''
+    res = normalize_space(elem.text)
     for child in elem:
         tail_added = False
-        if child.tag == 'em':
+        # We can meet <p/> inside <blockquote/> as in
+        # https://what-if.xkcd.com/160.
+        if child.tag == 'p':
+            # TODO: A formula inside <p/>, which is inside
+            # <blockquote/>?
+            res += process_childs(child, state)
+            res += state['par_sep']
+        elif child.tag == 'em':
             child_mark = '_' if em_mark == '*' else '*'
             res += em_mark
             res += process_childs(child, state, em_mark=child_mark)
             res += em_mark
-        elif child.tag == 'strong':
+        elif child.tag == 'strong' or child.tag == 'b':
             child_mark = '__' if strong_mark == '**' else '**'
             res += strong_mark
             res += process_childs(child, state, strong_mark=child_mark)
@@ -321,10 +346,16 @@ def process_childs(elem, state, em_mark='*', strong_mark='**'):
         elif child.tag == 'img':
             res += process_img(child, state)
         else:
-            res += lxml.html.tostring(child, encoding='unicode')
+            tail = lxml.html.tostring(child, encoding='unicode')
+            if res.endswith('\n'):
+                tail = tail.lstrip()
+            res += tail
             tail_added = True
         if not tail_added:
-            res += child.tail or ''
+            tail = normalize_space(child.tail)
+            if res.endswith('\n'):
+                tail = tail.lstrip()
+            res += tail
     return res
 
 
@@ -401,10 +432,11 @@ def process_toplevel_blockquote(elem, state):
     Detect non-inline formula. Dump paragraph footnotes after an element.
 
     """
-    res = '> '
     # TODO: check for formula only for entire fragment
-    res += maybe_formula(elem.text or '')
+    res = maybe_formula(elem.text or '')
     res += process_childs(elem, state)
+    res = prefix_each_line('> ', res.strip())
+
     res += state['par_sep']
     res += pop_footnotes(state)
     return res

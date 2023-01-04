@@ -24,6 +24,7 @@ The module defines set of functions for downloading and parsing articles from
 #   after a first line of the block. Example: http://what-if.xkcd.com/147/
 
 
+import re
 import sys
 import io
 import logging
@@ -209,11 +210,24 @@ def pop_footnotes(state):
     return res
 
 
-def process_toplevel_a(a_elem, state):
-    """ Process toplevel <a/> element (child of <article/>). """
-    title = a_elem.xpath('./h1')[0].text.strip()
-    url = full_url(a_elem.get('href'), context_url=state['base_url'])
-    num = int(url.rstrip('/').rsplit('/', 1)[1])
+def process_article_title(doc, state):
+    """ Process the navigation bar and the <h2/> element.
+
+    Add the article title into the result and fill 'slug'.
+
+    """
+    # Previous article number + 1. If it doesn't work, we're likely process
+    # the first article (or the HTML layout is changed).
+    num = 1
+    prev_button = doc.xpath('//body//nav/a/button[@class="prev"]')[0]
+    prev_url = full_url(prev_button.getparent().get('href'),
+                        context_url=state['base_url'])
+    m = re.match(r'^https://[^/]+/(?P<num>\d+)/?(?:#.*)?$', prev_url)
+    if m:
+        num = int(m.group('num')) + 1
+
+    title = doc.xpath('//body//h2[@id="title"]/a')[0].text.strip()
+    url = 'https://what-if.xkcd.com/{}'.format(num)
 
     state['slug'] = str(num).rjust(3, '0') + '-' + title.lower() \
         .replace(' ', '-').replace('.', '').replace(',', '')
@@ -437,11 +451,10 @@ def process_article(url, html):
 
     state = new_parser(url)
 
-    res = ''
+    res = process_article_title(doc, state)
     childs_cnt = len(article)
     childs_processed = 0
     func_dict = {
-        'a': process_toplevel_a,
         'p': process_toplevel_p,
         'blockquote': process_toplevel_blockquote,
         'img': process_toplevel_img,

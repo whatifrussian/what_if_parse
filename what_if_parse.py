@@ -447,6 +447,11 @@ def process_article(url, html):
     markdown and a 'slug' (king of article id, for using in filenames).
 
     """
+    # The source HTML has no <meta charset="..."> tag. We should point the
+    # source HTML encoding to lxml. Let's add the tag manually: I see no other
+    # way to point the encoding. See also the get_page() comment.
+    html = re.sub(b'<head>', b'<head><meta charset="utf-8">', html, 1)
+
     doc = lxml.html.document_fromstring(html)
     article = doc.xpath('//body//article')[0]
     article_html = inner_html(article)

@@ -3,7 +3,7 @@
 """ Main what-if downloading and parsing module
 
 The module defines set of functions for downloading and parsing articles from
-'http://what-if.xkcd.com'.
+'https://what-if.xkcd.com'.
 
 """
 
@@ -21,7 +21,7 @@ The module defines set of functions for downloading and parsing articles from
 
 # TODO's, which a kind of bug:
 # * A footnote body referenced in blockquote should follow after the block, not
-#   after a first line of the block. Example: http://what-if.xkcd.com/147/
+#   after a first line of the block. Example: https://what-if.xkcd.com/147/
 
 
 import re
@@ -93,7 +93,7 @@ def is_text_html(url):
 # decode resulting string manually (e.g. using 'codecs' module) when you
 # intent to process HTML manually. When lxml used to parse HTML, it decodes
 # HTML string itself according to 'content-type' attribute in 'meta' tag.
-# Related discussion: http://stackoverflow.com/a/25023776
+# Related discussion: https://stackoverflow.com/a/25023776
 def get_page(url, raise_non_text_html=False):
     """ Get HTML page or raise GetPageError exception.
 
@@ -185,7 +185,7 @@ def full_url(url, context_url):
 def inner_html(node, strip=True):
     """ Get inner HTML from lxml node.
 
-    http://stackoverflow.com/a/24151860/1598057
+    https://stackoverflow.com/a/24151860/1598057
 
     """
     res = node.text or ''
@@ -520,7 +520,7 @@ def get_args():
                 usage()
                 exit(EXIT_WRONG_ARGS)
             else:
-                url = 'http://what-if.xkcd.com/{num}/'.format(
+                url = 'https://what-if.xkcd.com/{num}/'.format(
                     num=a.lstrip('0'))
         else:
             usage()
@@ -528,7 +528,7 @@ def get_args():
 
     # Default values
     if not url:
-        url = 'http://what-if.xkcd.com'
+        url = 'https://what-if.xkcd.com'
     # args['native_newline'] is already False
 
     # Processing some arguments here
@@ -562,7 +562,7 @@ def save_article(slug, native_newline, a_html, a_md):
     html_file = tmpl % (slug, timestamp, 'html')
     md_file = tmpl % (slug, timestamp, 'md')
 
-    # http://stackoverflow.com/a/23434608
+    # https://stackoverflow.com/a/23434608
     newline = None if native_newline else ''
     with io.open(html_file, 'w', encoding='utf-8', newline=newline) as f:
         logging.info('Write article in html to file %s', html_file)

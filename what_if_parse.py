@@ -220,14 +220,17 @@ def process_article_title(doc, state):
     Add the article title into the result and fill 'slug'.
 
     """
-    # Previous article number + 1. If it doesn't work, we're likely process
-    # the first article (or the HTML layout is changed).
+    # Previous article number + 1. If the URL is just '#', it is the first
+    # article.
     num = 1
     prev_button = doc.xpath('//body//nav/a/button[@class="prev"]')[0]
-    prev_url = full_url(prev_button.getparent().get('href'),
-                        context_url=state['base_url'])
-    m = re.match(r'^https://[^/]+/(?P<num>\d+)/?(?:#.*)?$', prev_url)
-    if m:
+    href = prev_button.getparent().get('href')
+    if href != '#':
+        prev_url = full_url(href, context_url=state['base_url'])
+        m = re.match(r'^https://[^/]+/(?P<num>\d+)/?(?:#.*)?$', prev_url)
+        if not m:
+            raise RuntimeError('Unexpected previous article URL: {}'.format(
+                prev_url))
         num = int(m.group('num')) + 1
 
     title = doc.xpath('//body//h2[@id="title"]/a')[0].text.strip()

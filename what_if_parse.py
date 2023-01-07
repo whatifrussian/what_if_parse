@@ -164,9 +164,11 @@ def full_url(url, context_url):
     """
     proto, tail = context_url.split(':', 1)
     context_base = proto + '://' + tail.lstrip('/').split('/', 1)[0]
+    context_page = context_url.split('#', 1)[0]
 
-    if url.startswith('#'):
-        context_page = context_url.split('#', 1)[0]
+    if url == '':
+        return context_page
+    elif url.startswith('#'):
         return context_page + url
     elif url.startswith('//'):
         return proto + ':' + url

@@ -9,14 +9,41 @@ import unittest
 
 class ParserTests(unittest.TestCase):
     """ Set of tests for HTML to markdown parsing. """
-    PAGE_URL = 'TESTING'
-    HTML_TMPL = '<html><body><article>%s</article></body></html>'
+    PAGE_TITLE = 'A testing title'
+    PREV_URL = 'https://what-if.xkcd.com/9999/'
+    NEXT_URL = 'https://what-if.xkcd.com/10001/'
+    PAGE_URL = 'https://what-if.xkcd.com/10000/'
+    HTML_TMPL = """
+        <html><body><section id="entry-wrapper">'
+            <nav class="main-nav">'
+                <a href="{prev_url}">
+                    <button class="prev">&#x25c0;&#xFE0E;</button>
+                </a>
+                <a href="{next_url}">
+                    <button class="next">&#x25b6;&#xFE0E;</button>
+                </a>
+            </nav>
+            <h2 id="title"><a href="">{title}</a></h2>
+            <article>
+                {article_html}
+            </article>
+        </section></body></html>
+    """
 
     def do_check_equal(self, article_html, article_md):
         """ Wrap HTML paragraps into the template, parse and equal check."""
-        html = ParserTests.HTML_TMPL % article_html
-        processed = process_article(ParserTests.PAGE_URL, html)[1]
-        self.assertEqual(processed, article_md)
+        html = bytes(self.HTML_TMPL.format(
+            prev_url=self.PREV_URL,
+            next_url=self.NEXT_URL,
+            title=self.PAGE_TITLE,
+            article_html=article_html), encoding='utf-8')
+        md = process_article(ParserTests.PAGE_URL, html)[1]
+
+        exp = '{title}\n{page_url}\n\n{article_md}'.format(
+                title=self.PAGE_TITLE,
+                page_url=self.PAGE_URL.rstrip('/'),
+                article_md=article_md)
+        self.assertEqual(md, exp)
 
     def setUp(self):
         """ Setting up, nothing to do. """

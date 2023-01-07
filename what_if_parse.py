@@ -239,19 +239,19 @@ def process_article_title(doc, state):
 
 def process_a(a_elem, state):
     """ Process inline <a/> element (somewhere under <article/>). """
-    res_tmpl = '[%s]' % inner_html(a_elem) + '[%d]'
-    cur_url = full_url(a_elem.get('href'), context_url=state['base_url'])
+    txt = inner_html(a_elem)
+    url = full_url(a_elem.get('href'), context_url=state['base_url'])
 
     # check if we already have that URL (in case of two or more links to the
     # same page)
     for ref in state['references']:
-        if ref['url'] == cur_url:
-            return res_tmpl % ref['num']
+        if ref['url'] == url:
+            return '[{}][{}]'.format(txt, ref['num'])
 
-    res = res_tmpl % state['ref_counter']
+    res = '[{}][{}]'.format(txt, state['ref_counter'])
     ref = {
         'num': state['ref_counter'],
-        'url': cur_url,
+        'url': url,
     }
     state['references'].append(ref)
     state['ref_counter'] += 1

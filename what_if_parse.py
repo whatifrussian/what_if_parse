@@ -176,6 +176,8 @@ def full_url(url, context_url):
         return context_base.rstrip('/') + '/' + url.lstrip('/')
     elif url.startswith(('http://', 'https://', 'ftp://')):
         return url
+    elif url.startswith('doi:'):
+        return url
     else:
         # Need we support relational link like
         # 'smth.html', './smth.html', or '../smth.html'?

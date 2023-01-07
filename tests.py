@@ -37,7 +37,12 @@ class ParserTests(unittest.TestCase):
             next_url=self.NEXT_URL,
             title=self.PAGE_TITLE,
             article_html=article_html), encoding='utf-8')
-        md = process_article(ParserTests.PAGE_URL, html)[1]
+        args = {
+            'native_newline': False,
+            'verbose': False,
+            'no_link_title': False,
+        }
+        md = process_article(ParserTests.PAGE_URL, html, args)[1]
 
         exp = '{title}\n{page_url}\n\n{article_md}'.format(
                 title=self.PAGE_TITLE,

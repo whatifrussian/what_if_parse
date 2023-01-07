@@ -11,8 +11,6 @@ The module defines set of functions for downloading and parsing articles from
 # TODO's, which a kind of enhancement:
 # * Add an option for only checking if new article published. Need caching
 #   last article number in a file. Need properly documenting it.
-# * Maybe add an option for disable downloading pages for title extracting
-#   (for example when it produces unexpected errors).
 # * Add an markdown text to Notabenoid.
 # * Add an option for sending notification to our mailing list and our
 #   groupchat if particular event occured (e.g. new article found or new
@@ -415,13 +413,16 @@ def postprocess_references(state):
     res = ''
     refs_cnt = len(state['references'])
     for reference in state['references']:
-        title_text = get_title(reference, refs_cnt).replace('"', '\\"')
+        if state['args']['no_link_title']:
+            title_text = 'TODO'
+        else:
+            title_text = get_title(reference, refs_cnt).replace('"', '\\"')
         res += '[%s]: %s "%s"' % \
             (reference['num'], reference['url'], title_text) + state['par_sep']
     return res
 
 
-def new_parser(url):
+def new_parser(url, args):
     """ Return new (clean) parser state. """
     state = {
         'slug': None,
@@ -433,13 +434,14 @@ def new_parser(url):
         'indent': ' ' * 4,
         'footnotes': [],
         'references': [],
+        'args': args,
     }
     if NOTABENOID_SPACES_WORKAROUND:
         state['indent'] = '<-->'
     return state
 
 
-def process_article(url, html):
+def process_article(url, html, args):
     """ Process all toplevel article elements (childs of <article/>).
 
     In markdown references added after all text paragraps (HTML toplevel
@@ -456,7 +458,7 @@ def process_article(url, html):
     article = doc.xpath('//body//article')[0]
     article_html = inner_html(article)
 
-    state = new_parser(url)
+    state = new_parser(url, args)
 
     res = process_article_title(doc, state)
     childs_cnt = len(article)
@@ -496,6 +498,9 @@ Available options are the following.\n\
                   EOL can be painful when you try to diff\'ing changes\n\
                   across several OSes.\n\
 \n\
+--no-link-title   Don\'t collect titles for linked pages. It speeds up the\n\
+                  process a lot.\n\
+\n\
 --help | -h | -?  Display this cheatsheet.' % sys.argv[0], file=file)
 
 
@@ -508,6 +513,7 @@ def get_args():
     args = {
         'native_newline': False,
         'verbose': False,
+        'no_link_title': False,
     }
 
     for a in sys.argv[1:]:
@@ -518,6 +524,8 @@ def get_args():
             args['verbose'] = True
         elif a == '--native-newline':
             args['native_newline'] = True
+        elif a == '--no-link-title':
+            args['no_link_title'] = True
         elif a.isdigit():
             if url:
                 logging.critical(
@@ -598,7 +606,7 @@ def main():
     prettify_logging()
     url, args = get_args()
     html = download_article(url)
-    a_html, a_md, slug = process_article(url, html)
+    a_html, a_md, slug = process_article(url, html, args)
     save_article(slug, args['native_newline'], a_html, a_md)
 
 

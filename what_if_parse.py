@@ -214,6 +214,19 @@ def pop_footnotes(state):
     return res
 
 
+def slugify(num, title):
+    num_zero_filled = str(num).rjust(3, '0')
+    title_slugified = title.lower() \
+        .replace(' ', '-') \
+        .replace('.', '') \
+        .replace(',', '') \
+        .replace("'", '') \
+        .replace('!', '') \
+        .replace('$', '') \
+        .replace(':', '')
+    return '{}-{}'.format(num_zero_filled, title_slugified)
+
+
 def process_article_title(doc, state):
     """ Process the navigation bar and the <h2/> element.
 
@@ -236,8 +249,7 @@ def process_article_title(doc, state):
     title = doc.xpath('//body//h2[@id="title"]/a')[0].text.strip()
     url = 'https://what-if.xkcd.com/{}'.format(num)
 
-    state['slug'] = str(num).rjust(3, '0') + '-' + title.lower() \
-        .replace(' ', '-').replace('.', '').replace(',', '')
+    state['slug'] = slugify(num, title)
 
     res = title + state['line_break']
     res += url + state['par_sep']

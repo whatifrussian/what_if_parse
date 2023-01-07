@@ -22,6 +22,7 @@ The module defines set of functions for downloading and parsing articles from
 #   after a first line of the block. Example: https://what-if.xkcd.com/147/
 
 
+import os
 import re
 import sys
 import io
@@ -72,6 +73,16 @@ class GetPageError(Exception):
         else:
             more_str = ''
         return tmpl % (self.desc, self.url, more_str)
+
+
+def timestamp():
+    return datetime.now(TZ()).strftime('%Y%m%d-%H%M%S%z')
+
+
+def safe_makedirs(directory):
+    if os.path.isdir(directory):
+        return
+    os.makedirs(directory)
 
 
 def is_text_html(url):
@@ -249,6 +260,7 @@ def process_article_title(doc, state):
     title = doc.xpath('//body//h2[@id="title"]/a')[0].text.strip()
     url = 'https://what-if.xkcd.com/{}'.format(num)
 
+    state['num'] = num
     state['slug'] = slugify(num, title)
 
     res = title + state['line_break']
@@ -444,6 +456,7 @@ def postprocess_references(state):
 def new_parser(url, args):
     """ Return new (clean) parser state. """
     state = {
+        'num': None,
         'slug': None,
         'base_url': url,
         'ref_counter': 1,
@@ -499,7 +512,7 @@ def process_article(url, html, args):
     logging.info('Postprocessing references...')
     res += postprocess_references(state)
 
-    return article_html, res.strip(), state['slug']
+    return article_html, res.strip(), state
 
 
 def usage(file=sys.stderr):
@@ -509,6 +522,9 @@ Usage: %s [options] [num]\n\
 \n\
 The script will generate two files with naming scheme\n\
 {num}-{title}-{timestamp}.{html,md}\n\
+\n\
+If "num" has special value "all", all articles are processed and stored\n\
+in a "articles-{timestamp}" directory.\n\
 \n\
 Available options are the following.\n\
 \n\
@@ -528,12 +544,21 @@ def get_args():
     help and exit when user ask to help or provide wrong arguments.
 
     """
-    url = None
+    has_url = False
+    url = 'https://what-if.xkcd.com'
     args = {
         'native_newline': False,
         'verbose': False,
         'no_link_title': False,
+        'fetch_all_articles': False,
+        'output_directory': '.',
+        'timestamp_in_filename': True,
     }
+
+    if sys.argv[0].endswith('what_if_parse_all.py'):
+        sys.argv.append('--no-link-title')
+        sys.argv.append('--verbose')
+        sys.argv.append('all')
 
     for a in sys.argv[1:]:
         if a in ('--help', '-h', '-?'):
@@ -541,32 +566,31 @@ def get_args():
             exit(EXIT_SUCCESS)
         elif a in ('--verbose', '-v'):
             args['verbose'] = True
+            root_logger = logging.getLogger()
+            root_logger.setLevel(logging.INFO)
         elif a == '--native-newline':
             args['native_newline'] = True
         elif a == '--no-link-title':
             args['no_link_title'] = True
-        elif a.isdigit():
-            if url:
+        elif a.isdigit() or a == 'all':
+            if has_url:
                 logging.critical(
                     'An article number found at least twice in arguments')
                 usage()
                 exit(EXIT_WRONG_ARGS)
+            elif a == 'all':
+                args['fetch_all_articles'] = True
+                args['output_directory'] = 'articles-{timestamp}'.format(
+                    timestamp=timestamp())
+                args['timestamp_in_filename'] = False
+                has_url = True
             else:
                 url = 'https://what-if.xkcd.com/{num}/'.format(
                     num=a.lstrip('0'))
+                has_url = True
         else:
             usage()
             exit(EXIT_WRONG_ARGS)
-
-    # Default values
-    if not url:
-        url = 'https://what-if.xkcd.com'
-    # args['native_newline'] is already False
-
-    # Processing some arguments here
-    if args['verbose']:
-        root_logger = logging.getLogger()
-        root_logger.setLevel(logging.INFO)
 
     return (url, args)
 
@@ -587,15 +611,24 @@ def download_article(url):
     return html
 
 
-def save_article(slug, native_newline, a_html, a_md):
+def save_article(slug, args, a_html, a_md):
     """ Write resulting HTML and Markdown to appropriate files. """
-    tmpl = '%s-%s.%s'
-    timestamp = datetime.now(TZ()).strftime('%Y%m%d-%H%M%S%z')
-    html_file = tmpl % (slug, timestamp, 'html')
-    md_file = tmpl % (slug, timestamp, 'md')
+    if args['timestamp_in_filename']:
+        tstamp = timestamp()
+        html_file = '{slug}-{tstamp}.html'.format(slug=slug, tstamp=tstamp)
+        md_file = '{slug}-{tstamp}.md'.format(slug=slug, tstamp=tstamp)
+    else:
+        html_file = '{slug}.html'.format(slug=slug)
+        md_file = '{slug}.md'.format(slug=slug)
+
+    odir = args['output_directory']
+    html_file = os.path.join(odir, html_file)
+    md_file = os.path.join(odir, md_file)
+
+    safe_makedirs(odir)
 
     # https://stackoverflow.com/a/23434608
-    newline = None if native_newline else ''
+    newline = None if args['native_newline'] else ''
     with io.open(html_file, 'w', encoding='utf-8', newline=newline) as f:
         logging.info('Write article in html to file %s', html_file)
         f.write(a_html + '\n')
@@ -624,9 +657,21 @@ def main():
     """
     prettify_logging()
     url, args = get_args()
-    html = download_article(url)
-    a_html, a_md, slug = process_article(url, html, args)
-    save_article(slug, args['native_newline'], a_html, a_md)
+    if args['fetch_all_articles']:
+        while True:
+            html = download_article(url)
+            a_html, a_md, state = process_article(url, html, args)
+            slug = state['slug']
+            num = state['num']
+            save_article(slug, args, a_html, a_md)
+            if num == 1:
+                break
+            url = 'https://what-if.xkcd.com/{num}/'.format(num=num-1)
+    else:
+        html = download_article(url)
+        a_html, a_md, state = process_article(url, html, args)
+        slug = state['slug']
+        save_article(slug, args, a_html, a_md)
 
 
 if __name__ == '__main__':

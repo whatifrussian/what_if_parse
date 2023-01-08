@@ -7,21 +7,6 @@ The module defines set of functions for downloading and parsing articles from
 
 """
 
-
-# TODO's, which a kind of enhancement:
-# * Add an option for only checking if new article published. Need caching
-#   last article number in a file. Need properly documenting it.
-# * Add an markdown text to Notabenoid.
-# * Add an option for sending notification to our mailing list and our
-#   groupchat if particular event occured (e.g. new article found or new
-#   article landed to Notabenoid).
-# * Write instruction about deployment using cron.
-
-# TODO's, which a kind of bug:
-# * A footnote body referenced in blockquote should follow after the block, not
-#   after a first line of the block. Example: https://what-if.xkcd.com/147/
-
-
 import os
 import re
 import sys

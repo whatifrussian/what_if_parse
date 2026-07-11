@@ -1,22 +1,54 @@
-## About
+# what_if_parse
 
-The tool for grabbing http://what-if.xkcd.com articles into Markdown.
+A tool for downloading `https://what-if.xkcd.com` articles and converting
+their contents to Markdown. Python 3.10 or newer is supported.
 
 ## Install
 
-The script written on Python 3 and requires `requests` and `lxml` packages. You can install these packages by system package manager or by `pip` tool using `requirements.txt` file (it contains versions of packages that works for me).
+Create a virtual environment and install the dependencies:
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements.txt
+```
 
 ## Usage
 
+```sh
+python what_if_parse.py [num]
 ```
-$ ./what_if_parse [num]
+
+`num` is optional. If omitted, the latest article is downloaded. Pass `all`
+to download every article, newest first.
+
+See all options with `python what_if_parse.py --help`.
+
+Generated HTML and Markdown files are written to the current directory and
+include a timestamp in their names.
+
+## Docker
+
+Build the image and write generated files into a local `output` directory:
+
+```sh
+docker build -t what-if-parse .
+mkdir -p output
+docker run --rm -v "$PWD/output:/output" what-if-parse 1
 ```
 
-Where `num` is optional article number for grabbing. If it ommited, last article will grabbed.
+The container runs as an unprivileged user. On Linux, make sure the mounted
+directory is writable by that user.
 
-More options described in the cheatsheet, which can be displayed by `./what_if_parse --help`.
+## Development
 
-Resulting HTML and Markdown will saved into files like `001-relativistic-baseball-20160210-232959+0300.html` and `001-relativistic-baseball-20160210-232959+0300.html`. A timestamp added for simplify tracking changes.
+```sh
+python -m pip install -r requirements-dev.txt
+python -m unittest --verbose
+ruff check .
+docker build -t what-if-parse:test .
+docker run --rm what-if-parse:test --help
+```
 
 ## License
 

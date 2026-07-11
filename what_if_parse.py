@@ -13,9 +13,10 @@ import sys
 import io
 import logging
 from datetime import tzinfo, timedelta, datetime
+from urllib.parse import urljoin, urlparse
 import lxml.html
 import requests
-from requests.exceptions import RequestException, BaseHTTPError
+from requests.exceptions import RequestException
 
 
 EXIT_SUCCESS = 0
@@ -29,6 +30,7 @@ NOTABENOID_SPACES_WORKAROUND = True
 TIMEZONE_OFFSET_HOURS = 3
 # Avoid infinite freeze.
 HTTP_TIMEOUT = 10
+USER_AGENT = 'what-if-parse/2.0 (+https://github.com/whatifrussian/what_if_parse)'
 
 
 class TZ(tzinfo):
@@ -70,19 +72,6 @@ def safe_makedirs(directory):
     os.makedirs(directory)
 
 
-def is_text_html(url):
-    try:
-        res = requests.head(url, allow_redirects=True, timeout=HTTP_TIMEOUT)
-    except (RequestException, BaseHTTPError):
-        err = 'HTTP HEAD request failed before status code become available'
-        raise GetPageError(err, url)
-    if res.status_code != requests.codes['ok']:
-        err = 'HTTP HEAD request failed'
-        more = {'status_code': res.status_code}
-        raise GetPageError(err, url, more)
-    return res.headers['Content-Type'].startswith('text/html')
-
-
 # It always returns HTML content in it's original encoding, so you should
 # decode resulting string manually (e.g. using 'codecs' module) when you
 # intent to process HTML manually. When lxml used to parse HTML, it decodes
@@ -95,21 +84,25 @@ def get_page(url, raise_non_text_html=False):
     when download error occured.
 
     """
-    if not is_text_html(url):
-        if raise_non_text_html:
-            err = 'Content-Type is differs from text/html'
-            raise GetPageError(err, url)
-        else:
-            return None
     try:
-        res = requests.get(url, timeout=HTTP_TIMEOUT)
-    except (RequestException, BaseHTTPError):
+        res = requests.get(
+            url,
+            allow_redirects=True,
+            headers={'User-Agent': USER_AGENT},
+            timeout=HTTP_TIMEOUT,
+        )
+        res.raise_for_status()
+    except RequestException as exc:
         err = 'HTTP GET request failed before status code become available'
-        raise GetPageError(err, url)
-    if res.status_code != requests.codes['ok']:
-        err = 'HTTP GET request failed'
-        more = {'status_code': res.status_code}
-        raise GetPageError(err, url, more)
+        status = getattr(getattr(exc, 'response', None), 'status_code', None)
+        more = {'status_code': status} if status is not None else exc
+        raise GetPageError(err, url, more) from exc
+    content_type = res.headers.get('Content-Type', '').lower()
+    if not content_type.startswith('text/html'):
+        if raise_non_text_html:
+            err = 'Content-Type differs from text/html'
+            raise GetPageError(err, url, {'content_type': content_type})
+        return None
     return res.content
 
 
@@ -158,26 +151,11 @@ def full_url(url, context_url):
     Assume 'context_url' are full url.
 
     """
-    proto, tail = context_url.split(':', 1)
-    context_base = proto + '://' + tail.lstrip('/').split('/', 1)[0]
-    context_page = context_url.split('#', 1)[0]
-
-    if url == '':
-        return context_page
-    elif url.startswith('#'):
-        return context_page + url
-    elif url.startswith('//'):
-        return proto + ':' + url
-    elif url.startswith('/'):
-        return context_base.rstrip('/') + '/' + url.lstrip('/')
-    elif url.startswith(('http://', 'https://', 'ftp://')):
+    if url is None:
+        raise ValueError('URL is missing')
+    if url.startswith('doi:'):
         return url
-    elif url.startswith('doi:'):
-        return url
-    else:
-        # Need we support relational link like
-        # 'smth.html', './smth.html', or '../smth.html'?
-        raise NameError('bad url in \'full_url\':\nurl: ' + url + '\n')
+    return urljoin(context_url, url)
 
 
 def inner_html(node, strip=True):
@@ -241,26 +219,41 @@ def prefix_each_line(prefix, data):
     return prefix + prefix.join(lines).rstrip('\n')
 
 
+def article_number(url, doc):
+    """Find an article number without depending on navigation markup."""
+    path_match = re.search(r'/(\d+)/?$', urlparse(url).path)
+    if path_match:
+        return int(path_match.group(1))
+
+    # The home page is the newest article. Its previous link is therefore a
+    # reliable fallback even when xkcd changes buttons, icons, or wrappers.
+    for anchor in doc.xpath('//nav[contains(@class, "main-nav")]//a[@href]'):
+        href = full_url(anchor.get('href'), context_url=url)
+        match = re.search(r'/(\d+)/?$', urlparse(href).path)
+        if match:
+            classes = ' '.join([
+                anchor.get('class', ''),
+                ' '.join(anchor.xpath('.//*[@class]/@class')),
+            ])
+            if 'prev' in classes or urlparse(url).path in ('', '/'):
+                return int(match.group(1)) + 1
+
+    raise RuntimeError('Cannot determine article number from {}'.format(url))
+
+
 def process_article_title(doc, state):
     """ Process the navigation bar and the <h2/> element.
 
     Add the article title into the result and fill 'slug'.
 
     """
-    # Previous article number + 1. If the URL is just '#', it is the first
-    # article.
-    num = 1
-    prev_button = doc.xpath('//body//nav/a/button[@class="prev"]')[0]
-    href = prev_button.getparent().get('href')
-    if href != '#':
-        prev_url = full_url(href, context_url=state['base_url'])
-        m = re.match(r'^https://[^/]+/(?P<num>\d+)/?(?:#.*)?$', prev_url)
-        if not m:
-            raise RuntimeError('Unexpected previous article URL: {}'.format(
-                prev_url))
-        num = int(m.group('num')) + 1
-
-    title = doc.xpath('//body//h2[@id="title"]/a')[0].text.strip()
+    num = article_number(state['base_url'], doc)
+    titles = doc.xpath('//body//h2[@id="title"]')
+    if not titles:
+        titles = doc.xpath('//body//article/preceding::h2[1]')
+    if not titles:
+        raise RuntimeError('Cannot find article title')
+    title = normalize_space(titles[0].text_content()).strip()
     url = 'https://what-if.xkcd.com/{}'.format(num)
 
     state['num'] = num
@@ -434,7 +427,7 @@ def process_toplevel_img(img, state):
     img_name, img_ext = img_file.rsplit('.')
     img_file_ru = img_name + '_ru.' + img_ext
 
-    title_text = img.get('title').replace('"', '\\"')
+    title_text = (img.get('title') or '').replace('"', '\\"')
     if len(title_text) == 0:
         res = '![](/uploads/%s/%s)' % \
             (state['slug'], img_file_ru) + state['line_break']
@@ -504,7 +497,10 @@ def process_article(url, html, args):
     html = re.sub(b'<head>', b'<head><meta charset="utf-8">', html, 1)
 
     doc = lxml.html.document_fromstring(html)
-    article = doc.xpath('//body//article')[0]
+    articles = doc.xpath('//body//article')
+    if not articles:
+        raise RuntimeError('Cannot find article content')
+    article = articles[0]
     article_html = inner_html(article)
 
     state = new_parser(url, args)
